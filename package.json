@@ -1,0 +1,31 @@
+{
+  "name": "tiktok-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "6つのTikTokアカウントの企画・動画作成・投稿を自動化するエージェント群",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "plan:now": "tsx src/cli/runMorning.ts",
+    "plan:dry": "tsx src/cli/runMorning.ts --dry-run",
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@slack/bolt": "^5.1.0",
+    "dotenv": "^18.0.8",
+    "node-cron": "^4.6.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
