@@ -43,7 +43,7 @@ copy .env.example .env
 3. 「Install to Workspace」でインストールします。
 4. 「OAuth & Permissions」の **Bot User OAuth Token**（`xoxb-`で始まる）を、`.env` の `SLACK_BOT_TOKEN` に貼ります。
 5. 「Basic Information」→「App-Level Tokens」→「Generate Token and Scopes」で、`connections:write` を付けてトークンを作ります。**`xapp-`で始まるトークン**を `SLACK_APP_TOKEN` に貼ります。
-6. 手順1のチャンネルで `/invite @TikTok企画エージェント` と送り、ボットを招待します。
+6. 手順1のチャンネルで `/invite @tiktok-agent` と送り、ボットを招待します（候補に「TikTok企画エージェント」と表示されます）。
 7. チャンネル名を右クリック →「リンクをコピー」。URLの末尾にある `C` で始まる文字列を `SLACK_CHANNEL_ID` に貼ります。
 
 ### 5. YouTube の APIキー（競合調査用・無料）

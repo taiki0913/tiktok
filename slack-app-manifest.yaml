@@ -6,7 +6,7 @@ display_information:
   background_color: "#1f2937"
 features:
   bot_user:
-    display_name: TikTok企画エージェント
+    display_name: tiktok-agent   # 半角英小文字・数字・ハイフンのみ使える
     always_online: true
 oauth_config:
   scopes:
