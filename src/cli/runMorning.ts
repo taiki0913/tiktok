@@ -45,4 +45,6 @@ if (values["dry-run"]) {
   }).deps;
 }
 
-await runMorningPlanning(deps, date, { onlyAccountIds, force: values.force });
+// お試し実行は何度でも作り直せるよう、作成済みのアカウントも毎回作り直す
+const force = values.force || values["dry-run"];
+await runMorningPlanning(deps, date, { onlyAccountIds, force });
