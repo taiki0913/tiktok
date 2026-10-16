@@ -104,15 +104,22 @@ export async function searchRecentShorts(
   return toVideos(await getJson<VideosResponse>(videos), now);
 }
 
+/** タイトルにひらがな・カタカナ・漢字を含むか（日本語の動画かどうかの目安） */
+export function isJapaneseTitle(title: string): boolean {
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(title);
+}
+
 /** 複数の検索語の結果をまとめ、重複を除いて勢い順に上位 limit 件を返す */
 export async function collectTrendingShorts(
   apiKey: string,
   queries: readonly string[],
-  limit = 15,
+  { limit = 15, japaneseOnly = true } = {},
 ): Promise<YouTubeVideo[]> {
   const byId = new Map<string, YouTubeVideo>();
   for (const q of queries) {
-    for (const v of await searchRecentShorts(apiKey, q)) byId.set(v.id, v);
+    for (const v of await searchRecentShorts(apiKey, q)) {
+      if (!japaneseOnly || isJapaneseTitle(v.title)) byId.set(v.id, v);
+    }
   }
   return [...byId.values()].sort((a, b) => b.viewsPerDay - a.viewsPerDay).slice(0, limit);
 }

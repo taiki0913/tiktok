@@ -36,6 +36,8 @@ const AccountSchema = z.object({
   lengthSec: z.tuple([z.number().int().positive(), z.number().int().positive()]),
   research: z.object({
     youtubeQueries: z.array(z.string()).default([]),
+    /** true なら日本語タイトルの動画だけを調査対象にする */
+    japaneseOnly: z.boolean().default(true),
     webSearchHint: z.string().optional(),
   }),
   rules: z.array(z.string()).default([]),

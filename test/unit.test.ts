@@ -7,7 +7,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { loadAccounts } from "../src/config/accounts.js";
 import { PlanSchema, ResearchBriefSchema, type AccountDayState, type Proposal } from "../src/domain.js";
 import { extractTikTokUrls } from "../src/research/tiktokOembed.js";
-import { parseIsoDuration, toVideos } from "../src/research/youtube.js";
+import { isJapaneseTitle, parseIsoDuration, toVideos } from "../src/research/youtube.js";
 import {
   ACTIONS,
   accountBlocks,
@@ -90,6 +90,13 @@ test("YouTube: 動画時間の変換とショートの絞り込み", () => {
   assert.equal(videos[0]!.viewsPerDay, 10000);
   assert.equal(videos[0]!.commentCount, null);
   assert.equal(videos[0]!.url, "https://www.youtube.com/shorts/short1");
+});
+
+test("YouTube: 日本語タイトルの判定", () => {
+  assert.ok(isJapaneseTitle("【江戸時代】夜の明かり"));
+  assert.ok(isJapaneseTitle("マイクラ"));
+  assert.ok(!isJapaneseTitle("Ranking Weirdest Sea Creatures"));
+  assert.ok(!isJapaneseTitle("cat meme 😂"));
 });
 
 test("TikTok URL の抽出（Slack の <url|表示> 形式を含む）", () => {

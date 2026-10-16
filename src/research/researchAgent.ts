@@ -25,7 +25,9 @@ async function gatherInputs(
     notes.push("YOUTUBE_API_KEY が未設定のため YouTube 調査をスキップ");
   } else if (account.research.youtubeQueries.length > 0) {
     try {
-      youtube = await collectTrendingShorts(env.YOUTUBE_API_KEY, account.research.youtubeQueries);
+      youtube = await collectTrendingShorts(env.YOUTUBE_API_KEY, account.research.youtubeQueries, {
+        japaneseOnly: account.research.japaneseOnly,
+      });
     } catch (e) {
       notes.push(`YouTube 調査に失敗: ${(e as Error).message}`);
     }

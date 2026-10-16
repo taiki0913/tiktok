@@ -2,6 +2,9 @@
 # 企画エージェントと競合調査エージェントは、ここに書いた内容をもとに動きます。
 # 方向性を変えたいときは、このファイルを書き換えるだけでOKです。
 #
+# research.youtubeQueries … YouTubeショートの検索語（「-語句」で除外できる）
+# research.japaneseOnly   … 日本語タイトルの動画だけを調べるか（省略時は true）
+#
 # production（作り方）の種類:
 #   ai_video        … 全編AI映像（動画生成AI）＋ナレーション
 #   kamishibai      … AI静止画にカメラワーク（ズーム・パン・奥行き）を付けた「動く紙芝居」＋ナレーション
@@ -20,7 +23,7 @@ accounts:
     production: kamishibai
     lengthSec: [65, 90]
     research:
-      youtubeQueries: ["日本史 雑学", "歴史 ミステリー", "戦国時代 意外な事実"]
+      youtubeQueries: ["日本史 雑学", "江戸時代 暮らし", "歴史 ミステリー"]
       webSearchHint: 今週話題になっている日本史の新発見・発掘・研究ニュース、今週が記念日の歴史的出来事
     rules:
       - 史実・有力説・俗説をはっきり区別して語る
@@ -36,7 +39,8 @@ accounts:
     production: ai_video
     lengthSec: [65, 90]
     research:
-      youtubeQueries: ["都市伝説", "怖い話 短編", "意味がわかると怖い話"]
+      # 「-語句」で除外できる（マイクラの「都市伝説」動画が混ざるため）
+      youtubeQueries: ["都市伝説 怖い -マイクラ -マインクラフト", "怖い話 短編 -マイクラ", "意味がわかると怖い話"]
       webSearchHint: 今週SNSで話題になっている都市伝説・不思議な話・季節の怪談
     rules:
       - 実在の個人・企業・特定できる場所を、怖い話の舞台や加害者として扱わない
@@ -73,7 +77,7 @@ accounts:
     production: manga
     lengthSec: [60, 80]
     research:
-      youtubeQueries: ["漫画動画 ショート", "スカッと 漫画", "コンビニ あるある"]
+      youtubeQueries: ["ショート漫画 恋愛", "コンビニ あるある", "コンビニ 漫画"]
       webSearchHint: 今週の季節イベント・話題の新商品・SNSで話題の「あるある」ネタ
     rules:
       - 主要キャラの見た目・性格を毎回そろえる
@@ -90,7 +94,7 @@ accounts:
     production: motion_graphics
     lengthSec: [60, 75]
     research:
-      youtubeQueries: ["心理学 雑学", "人間関係 あるある", "心理テクニック"]
+      youtubeQueries: ["心理学 雑学", "職場 人間関係 あるある", "心理学 あるある"]
       webSearchHint: 今週話題の人間関係・職場・恋愛の悩みや、新しい心理学研究のニュース
     rules:
       - 医学的な診断のように断定しない（「〜の傾向がある」程度にとどめる）
@@ -107,7 +111,9 @@ accounts:
     production: data_viz
     lengthSec: [65, 90]
     research:
-      youtubeQueries: ["未来予測 日本", "2050年 日本", "データで見る日本"]
+      youtubeQueries: ["未来予測 日本", "2050年 日本", "人口 推計 日本"]
+      # 海外から見た日本の未来像も参考になるので、英語の動画も対象にする
+      japaneseOnly: false
       webSearchHint: 今週発表された政府統計・白書・研究機関の将来推計や、未来技術のニュース
     rules:
       - 数値には必ず出典（内閣府・総務省統計局・国立社会保障人口問題研究所など）を付ける
