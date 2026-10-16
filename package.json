@@ -11,6 +11,7 @@
     "start": "tsx src/index.ts",
     "plan:now": "tsx src/cli/runMorning.ts",
     "plan:dry": "tsx src/cli/runMorning.ts --dry-run",
+    "slack:test": "tsx src/cli/slackTest.ts",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts"
   },

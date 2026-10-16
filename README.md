@@ -45,6 +45,7 @@ copy .env.example .env
 5. 「Basic Information」→「App-Level Tokens」→「Generate Token and Scopes」で、`connections:write` を付けてトークンを作ります。**`xapp-`で始まるトークン**を `SLACK_APP_TOKEN` に貼ります。
 6. 手順1のチャンネルで `/invite @tiktok-agent` と送り、ボットを招待します（候補に「TikTok企画エージェント」と表示されます）。
 7. チャンネル名を右クリック →「リンクをコピー」。URLの末尾にある `C` で始まる文字列を `SLACK_CHANNEL_ID` に貼ります。
+8. `npm run slack:test` を実行し、チャンネルに「接続テスト」のメッセージが届けば完了です。
 
 ### 5. YouTube の APIキー（競合調査用・無料）
 1. https://console.cloud.google.com/ でプロジェクトを作ります。
