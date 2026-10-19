@@ -68,7 +68,7 @@ copy .env.example .env
 ### 6. VOICEVOX と BGM（動画づくり用）
 - **VOICEVOX**：アプリを起動しておくだけで使えます（起動していないと、ナレーションなしの動画になります）。
   声はアカウントごとに `config/accounts.yaml` の `voice` で決めています。キャラクターごとに利用規約があるので、[公式サイト](https://voicevox.hiroshiba.jp/)で確認してください。動画には「VOICEVOX:キャラ名」のクレジットが自動で入ります。
-- **BGM**：`public\bgm\<アカウントID>\` に、商用利用できるフリー音源を2〜3曲入れてください（詳しくは `public\bgm\README.md`）。
+- **BGM**：アカウントごとに、プログラムで作曲したオリジナル曲が2曲ずつ入っています（`public\bgm\`）。利用規約やクレジット表記を気にせず使えます。曲を足したいときは `public\bgm\README.md` を見てください。
 
 ### 7. お試し実行（Slackには送りません）
 ```powershell

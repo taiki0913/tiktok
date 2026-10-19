@@ -7,8 +7,3 @@ out/
 video/jobs/
 video/examples/*/stills/
 video/examples/*/public/
-public/bgm/**/*.mp3
-public/bgm/**/*.wav
-public/bgm/**/*.m4a
-public/bgm/**/*.aac
-public/bgm/**/*.ogg
