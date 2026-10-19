@@ -15,7 +15,7 @@ function systemPrompt(account: Account): string {
 - コンセプト: ${account.concept.trim()}
 - ターゲット: ${account.target}
 - トーン: ${account.tone}
-- 動画の作り方: ${PRODUCTION_STYLES[account.production]}
+- 動画の作り方: ${PRODUCTION_STYLES[account.production]}${account.visual ? `\n- 見た目の方針: ${account.visual}` : ""}
 - 尺: ${account.lengthSec[0]}〜${account.lengthSec[1]}秒
 
 # 企画の条件

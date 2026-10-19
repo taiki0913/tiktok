@@ -1,0 +1,64 @@
+{
+  "id": "example-future-population",
+  "accountId": "future",
+  "title": "あなたが70歳の年、日本は何人？（見本・短縮版）",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "durationInFrames": 636,
+  "scenes": [
+    {
+      "index": 0,
+      "from": 0,
+      "durationInFrames": 158,
+      "audioFrom": 9,
+      "caption": "あなたが70歳になる年、[日本は何人]？",
+      "narration": "あなたが70歳になる年、日本には何人いると思いますか。",
+      "visual": "昼の町を上空から。人口カウンターは2024年の1億2380万人",
+      "onScreen": [
+        "2024年 1億2380万人"
+      ],
+      "audio": ""
+    },
+    {
+      "index": 1,
+      "from": 158,
+      "durationInFrames": 179,
+      "audioFrom": 158,
+      "caption": "2056年ごろ、[1億人を下回る]という推計。",
+      "narration": "推計では、2056年ごろに、1億人を下回ります。",
+      "visual": "年表示が進み、町の人が減っていく。カウンターが減る",
+      "onScreen": [
+        "2056年 約9965万人"
+      ],
+      "audio": ""
+    },
+    {
+      "index": 2,
+      "from": 337,
+      "durationInFrames": 179,
+      "audioFrom": 337,
+      "caption": "2070年には[約8700万人]。今の7割ほど。",
+      "narration": "そして2070年には、約8700万人。今の7割ほどです。",
+      "visual": "人口の折れ線グラフが伸びる",
+      "onScreen": [
+        "2070年 約8700万人"
+      ],
+      "audio": ""
+    }
+  ],
+  "endCard": {
+    "from": 516,
+    "question": "あなたが70歳の年、日本は[どんな国]になっていてほしい？",
+    "sources": [
+      "総務省統計局「人口推計」",
+      "国立社会保障・人口問題研究所「日本の将来推計人口（令和5年推計）」"
+    ]
+  },
+  "bgm": null,
+  "credits": [
+    "VOICEVOX:No.7"
+  ],
+  "accent": "#3fd2ff",
+  "visual": "ポリゴン調の日本の町並みに、年表示・人口カウンター・グラフを重ねる。"
+}

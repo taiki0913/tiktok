@@ -1,11 +1,20 @@
 // Slack ボット：毎朝の企画を投稿し、ボタンで承認・修正・スキップを受け付ける。
 // Socket Mode を使うので、自宅PCでも外部公開のURLなしで動く。
+import { createReadStream } from "node:fs";
+import { basename } from "node:path";
 import bolt from "@slack/bolt";
 import type { App as BoltApp, BlockAction, ButtonAction } from "@slack/bolt";
 import type { Account } from "../config/accounts.js";
 import type { SlackEnv } from "../config/env.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { planAccount, type PlanNotifier, type PlanningDeps } from "../jobs/planning.js";
+import {
+  markQueued,
+  ProductionQueue,
+  type ProductionDeps,
+  type ProductionNotifier,
+  type Revision,
+} from "../production/pipeline.js";
 import { extractTikTokUrls, fetchTikTokEmbed } from "../research/tiktokOembed.js";
 import type { Store } from "../store/store.js";
 import { formatJpDate } from "../util/date.js";
@@ -15,17 +24,22 @@ import {
   accountFallbackText,
   ButtonValueSchema,
   countDecided,
+  failureBlocks,
+  isProductionBusy,
   ReferenceValueSchema,
   referencePromptBlocks,
   REVISE_CALLBACK,
+  reviewBlocks,
   reviseModal,
   summaryBlocks,
+  VIDEO_REVISE_CALLBACK,
+  videoReviseModal,
 } from "./blocks.js";
 
 const { App } = bolt;
 
-/** Slack に企画の状態を反映する */
-class SlackNotifier implements PlanNotifier {
+/** Slack に企画と動画づくりの状態を反映する */
+class SlackNotifier implements PlanNotifier, ProductionNotifier {
   constructor(
     private readonly app: BoltApp,
     private readonly channel: string,
@@ -79,6 +93,44 @@ class SlackNotifier implements PlanNotifier {
     await this.refreshSummary(day.date);
   }
 
+  /** 動画づくりの進み具合を反映し、完成・失敗したらスレッドに知らせる */
+  async productionUpdated(date: string, account: Account, state: AccountDayState): Promise<void> {
+    await this.accountUpdated(date, account, state);
+    const p = state.production;
+    if (!p || !state.slack) return;
+    const thread = { channel: state.slack.channel, thread_ts: state.slack.ts };
+
+    if (p.status === "approved" && p.slackReviewTs) {
+      await this.app.client.chat.update({
+        channel: state.slack.channel,
+        ts: p.slackReviewTs,
+        text: "公開OKにしました",
+        blocks: reviewBlocks(date, account.id, p),
+      });
+      return;
+    }
+    if (p.slackReviewTs) return; // この回の確認メッセージは投稿済み
+
+    if (p.status === "review" && p.videoFile) {
+      await this.app.client.files.uploadV2({
+        channel_id: thread.channel,
+        thread_ts: thread.thread_ts,
+        file: createReadStream(p.videoFile),
+        filename: basename(p.videoFile),
+        title: `${account.name}（${p.version}回目）`,
+      });
+      const res = await this.app.client.chat.postMessage({ ...thread, text: "動画ができました", blocks: reviewBlocks(date, account.id, p) });
+      await this.store.updateAccount(date, account.id, (s) => {
+        if (s.production) s.production.slackReviewTs = res.ts!;
+      });
+    } else if (p.status === "failed") {
+      const res = await this.app.client.chat.postMessage({ ...thread, text: "動画の作成に失敗しました", blocks: failureBlocks(date, account.id, p) });
+      await this.store.updateAccount(date, account.id, (s) => {
+        if (s.production) s.production.slackReviewTs = res.ts!;
+      });
+    }
+  }
+
   /** 一覧メッセージを更新し、全アカウントが決まったら一度だけ知らせる */
   async refreshSummary(date: string): Promise<void> {
     const day = await this.store.getDay(date);
@@ -112,6 +164,7 @@ class SlackNotifier implements PlanNotifier {
 export interface SlackBot {
   app: BoltApp;
   deps: PlanningDeps;
+  production: ProductionQueue;
 }
 
 export function createSlackBot(opts: {
@@ -120,11 +173,21 @@ export function createSlackBot(opts: {
   store: Store;
   /** チャンネルで「企画作成」と書かれたときに呼ぶ */
   onRunRequested: () => Promise<void>;
+  /** 動画づくりの設定 */
+  production: Omit<ProductionDeps, "store" | "notifier">;
 }): SlackBot {
   const { slack, accounts, store } = opts;
   const app = new App({ token: slack.botToken, appToken: slack.appToken, socketMode: true });
   const notifier = new SlackNotifier(app, slack.channelId, store, accounts);
   const deps: PlanningDeps = { store, notifier, accounts };
+  const production = new ProductionQueue({ ...opts.production, store, notifier }, accounts);
+
+  /** 動画づくりを順番待ちに入れる（作り直しのときは revision を渡す） */
+  const startProduction = async (date: string, account: Account, revision?: Revision): Promise<void> => {
+    const state = await markQueued(store, date, account.id, revision);
+    await notifier.productionUpdated(date, account, state);
+    production.enqueue(account.id, date);
+  };
 
   const findAccount = (id: string): Account => {
     const a = accounts.find((x) => x.id === id);
@@ -151,10 +214,20 @@ export function createSlackBot(opts: {
     });
   };
 
-  handleDecision(ACTIONS.approve, (s, i) => {
-    if (s.status !== "awaiting_approval" || i === undefined || !s.proposals?.[i]) return;
-    s.status = "approved";
-    s.selectedIndex = i;
+  // 案を決定したら、その場で動画づくりを順番待ちに入れる
+  app.action<BlockAction<ButtonAction>>(ACTIONS.approve, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    const account = findAccount(v.a);
+    let approvedNow = false;
+    const state = await store.updateAccount(v.d, v.a, (s) => {
+      if (s.status !== "awaiting_approval" || v.i === undefined || !s.proposals?.[v.i]) return;
+      s.status = "approved";
+      s.selectedIndex = v.i;
+      approvedNow = true;
+    });
+    await notifier.accountUpdated(v.d, account, state);
+    if (approvedNow) await startProduction(v.d, account);
   });
 
   handleDecision(ACTIONS.skip, (s) => {
@@ -162,9 +235,11 @@ export function createSlackBot(opts: {
   });
 
   handleDecision(ACTIONS.undo, (s) => {
+    if (isProductionBusy(s.production)) return; // 動画づくりの途中は取り消さない
     if ((s.status === "approved" || s.status === "skipped") && s.proposals) {
       s.status = "awaiting_approval";
       delete s.selectedIndex;
+      delete s.production;
     } else if (s.status === "skipped") {
       s.status = "error";
       s.error = "企画がまだありません。「もう一度作る」を押してください";
@@ -188,6 +263,41 @@ export function createSlackBot(opts: {
     const v = ButtonValueSchema.parse(JSON.parse(view.private_metadata));
     const instruction = view.state.values.instruction?.text?.value?.trim() ?? "";
     background("修正", planAccount(deps, findAccount(v.a), v.d, instruction));
+  });
+
+  // ---- 完成した動画の確認 ----
+  app.action<BlockAction<ButtonAction>>(ACTIONS.videoApprove, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    const account = findAccount(v.a);
+    const state = await store.updateAccount(v.d, v.a, (s) => {
+      if (s.production?.status === "review") s.production.status = "approved";
+    });
+    await notifier.productionUpdated(v.d, account, state);
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.videoReviseOpen, async ({ ack, action, body, client }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    await client.views.open({ trigger_id: body.trigger_id, view: videoReviseModal(v.d, findAccount(v.a)) });
+  });
+
+  app.view(VIDEO_REVISE_CALLBACK, async ({ ack, view }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(view.private_metadata));
+    const mode = view.state.values.mode?.value?.selected_option?.value === "script" ? "script" : "visual";
+    const instruction = view.state.values.instruction?.text?.value?.trim() ?? "";
+    const current = (await store.getDay(v.d))?.accounts[v.a]?.production;
+    if (isProductionBusy(current)) return;
+    background("動画の作り直し", startProduction(v.d, findAccount(v.a), { instruction, mode }));
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.videoRetry, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    const current = (await store.getDay(v.d))?.accounts[v.a]?.production;
+    if (isProductionBusy(current)) return;
+    background("動画の再作成", startProduction(v.d, findAccount(v.a)));
   });
 
   app.action<BlockAction<ButtonAction>>(
@@ -243,5 +353,5 @@ export function createSlackBot(opts: {
     console.error("[slack] エラー", e);
   });
 
-  return { app, deps };
+  return { app, deps, production };
 }

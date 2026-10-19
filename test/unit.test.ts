@@ -46,7 +46,7 @@ test("accounts.yaml: 6アカウントがすべて読み込める", () => {
   assert.equal(accounts.length, 6);
   assert.deepEqual(
     accounts.map((a) => a.production).sort(),
-    ["ai_video", "data_viz", "kamishibai", "manga", "motion_graphics", "stock_footage"],
+    ["ai_video", "manga", "motion_graphics", "polygon", "polygon", "polygon"],
   );
   for (const a of accounts) assert.ok(a.lengthSec[0] >= 60, `${a.id} は60秒以上`);
 });

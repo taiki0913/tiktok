@@ -20,6 +20,14 @@ const EnvSchema = z.object({
   // Web検索は費用の約2/3を占めるため、既定では使わない
   RESEARCH_WEB_SEARCH: boolFromString("false"),
 
+  // 動画づくり
+  VOICEVOX_URL: z.string().default("http://127.0.0.1:50021"),
+  /** 動画の書き出しに使う Chrome の場所（省略時は Remotion が自動で用意する） */
+  REMOTION_BROWSER_EXECUTABLE: z.string().optional(),
+  /** WebGL の描き方（GPU のないクラウドでは swangle） */
+  REMOTION_GL: z.enum(["angle", "egl", "swiftshader", "swangle", "vulkan", "angle-egl"]).optional(),
+  RENDER_CONCURRENCY: z.coerce.number().int().positive().optional(),
+
   MORNING_CRON: z.string().default("30 6 * * *"),
   TIMEZONE: z.string().default("Asia/Tokyo"),
   DATA_DIR: z.string().default("data"),

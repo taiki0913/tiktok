@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { loadAccounts } from "./config/accounts.js";
 import { env, requireClaudeEnv, requireSlackEnv } from "./config/env.js";
 import { runMorningPlanning } from "./jobs/planning.js";
+import { productionSettings } from "./production/settings.js";
 import { createSlackBot } from "./slack/app.js";
 import { Store } from "./store/store.js";
 import { dateInTz, hourInTz } from "./util/date.js";
@@ -39,9 +40,14 @@ const bot = createSlackBot({
   accounts,
   store,
   onRunRequested: () => runToday("Slackで「企画作成」"),
+  production: productionSettings(),
 });
 await bot.app.start();
 console.log(`[slack] 接続しました（アカウント数: ${accounts.length}）`);
+
+// 前回の終了時に作りかけだった動画があれば、続きから作る
+const resumed = await bot.production.resume(today());
+if (resumed > 0) console.log(`[produce] 作りかけの動画 ${resumed} 本の制作を再開します`);
 
 const task = cron.schedule(env.MORNING_CRON, () => runToday("定時実行"), {
   timezone: env.TIMEZONE,

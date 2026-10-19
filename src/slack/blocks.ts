@@ -2,7 +2,7 @@
 import type { types as Slack } from "@slack/bolt";
 import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
-import type { AccountDayState, DayState, Proposal } from "../domain.js";
+import type { AccountDayState, DayState, ProductionState, Proposal } from "../domain.js";
 import { formatJpDate } from "../util/date.js";
 
 export const ACTIONS = {
@@ -12,8 +12,12 @@ export const ACTIONS = {
   undo: "undo_decision",
   retry: "retry_account",
   saveReference: "save_reference",
+  videoApprove: "video_approve",
+  videoReviseOpen: "video_revise_open",
+  videoRetry: "video_retry",
 } as const;
 export const REVISE_CALLBACK = "revise_submit";
+export const VIDEO_REVISE_CALLBACK = "video_revise_submit";
 
 /** ボタンに埋め込む値。d=日付, a=アカウントID, i=案の番号 */
 export const ButtonValueSchema = z.object({
@@ -73,6 +77,123 @@ function proposalText(p: Proposal, i: number): string {
   ].join("\n");
 }
 
+const BUSY: ProductionState["status"][] = ["queued", "scripting", "voicing", "coding", "rendering"];
+export const isProductionBusy = (p?: ProductionState): boolean => !!p && BUSY.includes(p.status);
+
+/** 決定したアカウントのメッセージに出す、動画づくりの進み具合 */
+export function productionLine(p?: ProductionState): string {
+  if (!p) return "🎬 この企画で動画を作成します";
+  const v = p.version > 1 ? `（${p.version}回目）` : "";
+  switch (p.status) {
+    case "queued":
+      return `🎬 動画：順番待ち${v}`;
+    case "scripting":
+      return `🎬 動画：台本を作成中…${v}`;
+    case "voicing":
+      return `🎬 動画：ナレーションを作成中…${v}`;
+    case "coding":
+      return `🎬 動画：映像を作成中…（数分〜十数分）${v}`;
+    case "rendering":
+      return `🎬 動画：書き出し中…${v}`;
+    case "review":
+      return "🎬 動画ができました。このメッセージのスレッドで確認してください";
+    case "approved":
+      return "✅ 動画：公開OK（投稿待ち）";
+    case "failed":
+      return "⚠️ 動画の作成に失敗しました。スレッドを確認してください";
+    case "unsupported":
+      return "🎬 この作り方（漫画・AI映像）の動画づくりは準備中です";
+  }
+}
+
+/** 一覧メッセージ用の短い表示 */
+function productionShort(p?: ProductionState): string {
+  if (!p) return "";
+  const label: Record<ProductionState["status"], string> = {
+    queued: "🎬順番待ち",
+    scripting: "🎬制作中",
+    voicing: "🎬制作中",
+    coding: "🎬制作中",
+    rendering: "🎬制作中",
+    review: "🎬確認待ち",
+    approved: "🎬公開OK",
+    failed: "⚠️動画失敗",
+    unsupported: "🎬準備中",
+  };
+  return `　${label[p.status]}`;
+}
+
+/** スレッドに出す、完成した動画の確認メッセージ */
+export function reviewBlocks(date: string, accountId: string, p: ProductionState): Slack.KnownBlock[] {
+  const v = { d: date, a: accountId };
+  if (p.status === "approved") return [mrkdwn("✅ *公開OKにしました*（投稿の自動化は次のフェーズで追加します）")];
+  const blocks: Slack.KnownBlock[] = [
+    mrkdwn(`🎬 *動画ができました*（約${p.durationSec ?? "?"}秒・${p.version}回目）\n${p.agentSummary ?? ""}`),
+  ];
+  if (p.factsToCheck && p.factsToCheck.length > 0) {
+    blocks.push(
+      mrkdwn(
+        `⚠️ *確認してほしい事実*（台本エージェントが自信なしとしたもの）\n${p.factsToCheck
+          .map((f) => `• ${f.claim}（根拠：${f.basis}）`)
+          .join("\n")}`,
+      ),
+    );
+  }
+  const notes = [...p.warnings, ...(p.costUsd != null ? [`映像づくりの費用の目安：約$${p.costUsd.toFixed(2)}`] : [])];
+  if (notes.length > 0) blocks.push(context(notes.join("　/　")));
+  blocks.push({
+    type: "actions",
+    elements: [button("✅ 公開OK", ACTIONS.videoApprove, v, "primary"), button("✏️ 作り直す", ACTIONS.videoReviseOpen, v)],
+  });
+  return blocks;
+}
+
+export function failureBlocks(date: string, accountId: string, p: ProductionState): Slack.KnownBlock[] {
+  return [
+    mrkdwn(`⚠️ *動画の作成に失敗しました*（${p.version}回目）\n\`\`\`${truncate(p.error ?? "不明なエラー", 1500)}\`\`\``),
+    { type: "actions", elements: [button("🔄 もう一度作る", ACTIONS.videoRetry, { d: date, a: accountId }, "primary")] },
+  ];
+}
+
+export function videoReviseModal(date: string, account: Account): Slack.View {
+  return {
+    type: "modal",
+    callback_id: VIDEO_REVISE_CALLBACK,
+    private_metadata: JSON.stringify({ d: date, a: account.id }),
+    title: { type: "plain_text", text: "動画の作り直し" },
+    submit: { type: "plain_text", text: "作り直す" },
+    close: { type: "plain_text", text: "キャンセル" },
+    blocks: [
+      mrkdwn(`*${account.name}* の動画を作り直します。`),
+      {
+        type: "input",
+        block_id: "mode",
+        label: { type: "plain_text", text: "どこから作り直しますか？" },
+        element: {
+          type: "radio_buttons",
+          action_id: "value",
+          initial_option: { text: { type: "plain_text", text: "映像だけ直す" }, value: "visual" },
+          options: [
+            { text: { type: "plain_text", text: "映像だけ直す" }, value: "visual" },
+            { text: { type: "plain_text", text: "台本から作り直す" }, value: "script" },
+          ],
+        },
+      },
+      {
+        type: "input",
+        block_id: "instruction",
+        label: { type: "plain_text", text: "どう直してほしいですか？" },
+        element: {
+          type: "plain_text_input",
+          action_id: "text",
+          multiline: true,
+          placeholder: { type: "plain_text", text: "例：冒頭をもっと派手に。グラフの文字が小さい" },
+        },
+      },
+    ],
+  };
+}
+
 export function accountBlocks(
   date: string,
   account: Account,
@@ -112,9 +233,12 @@ export function accountBlocks(
       const p = state.proposals?.[i];
       blocks.push(
         mrkdwn(p ? `✅ *案${proposalLetter(i)}「${p.title}」に決定*\n${p.summary}` : "✅ 決定済み"),
-        context("この企画で動画を作成します"),
-        { type: "actions", elements: [button("↩️ 決定を取り消す", ACTIONS.undo, v)] },
+        context(productionLine(state.production)),
       );
+      // 動画づくりの途中は取り消せない（作りかけのものと食い違わないように）
+      if (!isProductionBusy(state.production)) {
+        blocks.push({ type: "actions", elements: [button("↩️ 決定を取り消す", ACTIONS.undo, v)] });
+      }
       break;
     }
 
@@ -179,7 +303,7 @@ export function summaryBlocks(day: DayState, accounts: Account[]): Slack.KnownBl
           return `🟡 ${a.name}：承認待ち`;
         case "approved": {
           const i = s.selectedIndex ?? 0;
-          return `✅ ${a.name}：案${proposalLetter(i)}「${s.proposals?.[i]?.title ?? ""}」`;
+          return `✅ ${a.name}：案${proposalLetter(i)}「${s.proposals?.[i]?.title ?? ""}」${productionShort(s.production)}`;
         }
         case "skipped":
           return `⏭ ${a.name}：スキップ`;

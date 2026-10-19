@@ -15,13 +15,16 @@
     "check": "tsc --noEmit && tsc --noEmit -p video",
     "test": "node --import tsx --test test/*.test.ts",
     "video:studio": "remotion studio video/index.ts",
-    "video:render": "remotion render video/index.ts DeepSeaPrototype out/deepsea-prototype.mp4"
+    "produce:dry": "tsx src/cli/produce.ts",
+    "video:sample": "tsx src/cli/renderSample.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
     "@fontsource/noto-sans-jp": "^5.3.1",
     "@react-three/fiber": "^9.8.2",
+    "@remotion/bundler": "^4.0.536",
     "@remotion/cli": "^4.0.536",
+    "@remotion/renderer": "^4.0.536",
     "@remotion/three": "^4.0.536",
     "@slack/bolt": "^5.1.0",
     "dotenv": "^18.0.8",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { VideoScript } from "./production/scriptAgent.js";
 
 /** 競合調査エージェントが企画エージェントに渡す「結果だけ」のまとめ */
 export const ResearchBriefSchema = z.object({
@@ -53,9 +54,44 @@ export const PlanSchema = z.object({
 
 export type AccountStatus = "planning" | "awaiting_approval" | "approved" | "skipped" | "error";
 
+export type ProductionStatus =
+  | "queued"
+  | "scripting"
+  | "voicing"
+  | "coding"
+  | "rendering"
+  | "review"
+  | "approved"
+  | "failed"
+  | "unsupported";
+
+/** 動画づくりの進み具合（企画が決定したあと） */
+export interface ProductionState {
+  status: ProductionStatus;
+  /** 何回目の制作か（作り直すたびに増える） */
+  version: number;
+  jobId?: string;
+  script?: VideoScript;
+  /** 書き出した mp4 の場所 */
+  videoFile?: string;
+  durationSec?: number;
+  /** 台本エージェントが「自信なし」とした事実 */
+  factsToCheck?: { claim: string; basis: string }[];
+  /** ナレーションを無音で代用したときなどの注意 */
+  warnings: string[];
+  agentSummary?: string;
+  costUsd?: number | null;
+  error?: string;
+  /** 作り直しの指示（mode=script は台本から、visual は映像だけ） */
+  revisions: { instruction: string; mode: "script" | "visual"; at: string }[];
+  /** スレッドに投稿した確認メッセージ */
+  slackReviewTs?: string;
+}
+
 export interface AccountDayState {
   accountId: string;
   status: AccountStatus;
+  production?: ProductionState;
   research?: ResearchBrief;
   proposals?: Proposal[];
   selectedIndex?: number;

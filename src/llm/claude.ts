@@ -6,17 +6,36 @@ import { env } from "../config/env.js";
 type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 // 安全判定で応答が断られたとき、サーバー側で推奨モデルに自動で切り替えて再実行する
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+export const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 let client: Anthropic | undefined;
-function getClient(): Anthropic {
+export function getClient(): Anthropic {
   client ??= new Anthropic({ maxRetries: 4 });
   return client;
 }
 
+/** 100万トークンあたりの料金（ドル）。費用の目安をログに出すために使う */
+const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
+  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+};
+
+/** 使ったトークン数から費用の目安（ドル）を出す。料金表にないモデルは null */
+export function estimateCostUsd(model: string, usage: Anthropic.Beta.BetaUsage): number | null {
+  const p = PRICES[model];
+  if (!p) return null;
+  return (
+    (usage.input_tokens * p.input +
+      usage.output_tokens * p.output +
+      (usage.cache_read_input_tokens ?? 0) * p.cacheRead +
+      (usage.cache_creation_input_tokens ?? 0) * p.cacheWrite) /
+    1_000_000
+  );
+}
+
 export class ClaudeResponseError extends Error {}
 
-function assertUsableStop(
+export function assertUsableStop(
   response: { stop_reason: string | null; stop_details?: { category?: string | null; explanation?: string | null } | null },
   label: string,
 ): void {

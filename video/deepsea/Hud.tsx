@@ -1,7 +1,7 @@
 // 画面に重ねる計器類：水深の数字、水圧・光のチップ、左の深度計、CG表記、最後の解説ラベル。
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
-import { FONT_FAMILY } from "../fonts";
+import { FONT_FAMILY } from "../kit/fonts";
 import { projectToScreen } from "./camera";
 import { snailfishPosition } from "./Scene";
 import {

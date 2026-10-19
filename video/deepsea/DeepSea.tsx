@@ -2,8 +2,8 @@
 import { ThreeCanvas } from "@remotion/three";
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { Caption } from "../components/Caption";
-import { useFontsReady } from "../fonts";
+import { Caption } from "../kit/Caption";
+import { useFontsReady } from "../kit/fonts";
 import { CAMERA_FOV, HEIGHT, WIDTH } from "./camera";
 import { DeepSeaHud, HIGHLIGHT } from "./Hud";
 import { DeepSeaScene } from "./Scene";

@@ -3,25 +3,24 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 export const PRODUCTION_STYLES = {
-  ai_video: "全編AI映像（動画生成AI）＋ナレーション。1カット8秒前後の映像をつなぐ",
-  kamishibai: "AI静止画にズーム・パン・奥行きのカメラワークを付けた「動く紙芝居」＋ナレーション",
-  stock_footage: "NASAなどの公開映像を中心に構成し、要所だけAI映像を使う解説動画",
+  polygon: "ポリゴン調の3D空間（建物・人物・乗り物・地形などを単純な立体で表現）に、数字・計器・地図・グラフ・字幕を重ねる",
+  motion_graphics: "図解・アイコン・テキストアニメーション・グラフだけで構成するモーショングラフィックス",
   manga: "見た目を固定したキャラのAIコマ画像を、コマ送り・吹き出し・効果音で動かす漫画動画",
-  motion_graphics: "図解・アイコン・テキストアニメーションだけで構成するモーショングラフィックス",
-  data_viz: "動くグラフ・地図などのデータ可視化と、未来の情景のAI静止画を組み合わせる",
+  ai_video: "全編AI映像（動画生成AI）＋ナレーション。1カット8秒前後の映像をつなぐ",
 } as const;
 
 export type ProductionStyle = keyof typeof PRODUCTION_STYLES;
 
 /** Slack などに表示する短い名前 */
 export const PRODUCTION_LABELS: Record<ProductionStyle, string> = {
-  ai_video: "全編AI映像",
-  kamishibai: "動く紙芝居",
-  stock_footage: "公開映像＋解説",
-  manga: "漫画動画",
+  polygon: "ポリゴン調3D",
   motion_graphics: "モーショングラフィックス",
-  data_viz: "データ可視化",
+  manga: "漫画動画",
+  ai_video: "全編AI映像",
 };
+
+/** 外部の生成AIを使わず、コードだけで動画を作れる作り方 */
+export const CODE_PRODUCIBLE: readonly ProductionStyle[] = ["polygon", "motion_graphics"];
 
 const productionStyleKeys = Object.keys(PRODUCTION_STYLES) as [ProductionStyle, ...ProductionStyle[]];
 
@@ -41,6 +40,17 @@ const AccountSchema = z.object({
     webSearchHint: z.string().optional(),
   }),
   rules: z.array(z.string()).default([]),
+  /** 動画の見た目の方針（色・世界観など）。動画作成エージェントが毎回そろえる */
+  visual: z.string().default(""),
+  /** 字幕や数字の強調色 */
+  accent: z.string().default("#ffcf3f"),
+  /** ナレーションの声（VOICEVOX のキャラクター名とスタイル名） */
+  voice: z.object({
+    speaker: z.string(),
+    style: z.string().default("ノーマル"),
+    /** 読み上げの速さ（1.0 が標準） */
+    speed: z.number().positive().default(1.15),
+  }),
   postTime: z.string().regex(/^\d{2}:\d{2}$/),
 });
 

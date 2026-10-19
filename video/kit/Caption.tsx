@@ -1,7 +1,7 @@
 // 画面下部の字幕。[ ] で囲んだ語を強調色で表示し、切り替わり時にふわっと出す。
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
-import { FONT_FAMILY } from "../fonts";
+import { FONT_FAMILY } from "./fonts";
 
 export interface CaptionItem {
   from: number;
