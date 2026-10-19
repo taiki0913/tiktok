@@ -12,20 +12,33 @@
     "plan:now": "tsx src/cli/runMorning.ts",
     "plan:dry": "tsx src/cli/runMorning.ts --dry-run",
     "slack:test": "tsx src/cli/slackTest.ts",
-    "check": "tsc --noEmit",
-    "test": "node --import tsx --test test/*.test.ts"
+    "check": "tsc --noEmit && tsc --noEmit -p video",
+    "test": "node --import tsx --test test/*.test.ts",
+    "video:studio": "remotion studio video/index.ts",
+    "video:render": "remotion render video/index.ts DeepSeaPrototype out/deepsea-prototype.mp4"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
+    "@fontsource/noto-sans-jp": "^5.3.1",
+    "@react-three/fiber": "^9.8.2",
+    "@remotion/cli": "^4.0.536",
+    "@remotion/three": "^4.0.536",
     "@slack/bolt": "^5.1.0",
     "dotenv": "^18.0.8",
     "node-cron": "^4.6.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.536",
+    "three": "^0.186.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/node-cron": "^3.0.11",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

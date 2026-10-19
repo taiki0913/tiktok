@@ -86,6 +86,18 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 - Claude API：6アカウント×毎日で、月 $30〜50 程度（修正指示の回数で変わります。Web検索を有効にすると月 $120 前後）
 - YouTube Data API：無料枠内
 
+## 動画の試作（ポリゴン調3D）
+
+「宇宙と深海のふしぎ」の企画「魚が絶対に行けない深さ」の冒頭15秒を、ポリゴン調の3Dで作った試作です（`video/` フォルダ）。
+
+```powershell
+npm run video:studio   # ブラウザでプレビュー（タイムラインを動かして確認できます）
+npm run video:render   # out\deepsea-prototype.mp4 に書き出し
+```
+初回の書き出しでは、動画を書き出すためのChromeが自動でダウンロードされます（数分かかります）。
+
+> **Remotion のライセンス**：個人と従業員3人以下の会社は無料、それより大きい会社は有料のライセンスが必要です。詳しくは https://www.remotion.dev/license を確認してください。
+
 ## 開発者向け
 
 ```powershell
@@ -101,3 +113,4 @@ npm test        # テスト
 | `src/jobs/` | 毎朝の一括実行 |
 | `src/store/` | 企画と承認状況の保存（`data/` フォルダにJSONで保存） |
 | `config/accounts.yaml` | 6アカウントの設定 |
+| `video/` | 動画の組み立て（Remotion＋three.js） |
