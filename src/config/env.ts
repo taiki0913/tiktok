@@ -1,10 +1,11 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const boolFromString = z
-  .enum(["true", "false"])
-  .default("true")
-  .transform((v) => v === "true");
+const boolFromString = (fallback: "true" | "false") =>
+  z
+    .enum(["true", "false"])
+    .default(fallback)
+    .transform((v) => v === "true");
 
 const EnvSchema = z.object({
   // ANTHROPIC_API_KEY は SDK が環境変数から直接読むので、ここでは存在チェックだけ行う
@@ -16,7 +17,8 @@ const EnvSchema = z.object({
   SLACK_CHANNEL_ID: z.string().optional(),
 
   YOUTUBE_API_KEY: z.string().optional(),
-  RESEARCH_WEB_SEARCH: boolFromString,
+  // Web検索は費用の約2/3を占めるため、既定では使わない
+  RESEARCH_WEB_SEARCH: boolFromString("false"),
 
   MORNING_CRON: z.string().default("30 6 * * *"),
   TIMEZONE: z.string().default("Asia/Tokyo"),

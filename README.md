@@ -80,10 +80,10 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 |---|---|
 | アカウントのジャンル・トーン・ルール・競合調査の検索語 | `config/accounts.yaml` |
 | 企画が届く時刻 | `.env` の `MORNING_CRON`（例：`0 6 * * *` で6:00開始） |
-| Web検索での話題調査を止める | `.env` の `RESEARCH_WEB_SEARCH=false` |
+| Web検索で今週の話題も調べる（費用が約3倍になります） | `.env` の `RESEARCH_WEB_SEARCH=true` |
 
 ## 費用の目安（フェーズ1）
-- Claude API：6アカウント×毎日で、月 $50〜100 程度（Web検索を含む。修正指示の回数で変わります）
+- Claude API：6アカウント×毎日で、月 $30〜50 程度（修正指示の回数で変わります。Web検索を有効にすると月 $120 前後）
 - YouTube Data API：無料枠内
 
 ## 開発者向け
