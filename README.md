@@ -96,6 +96,9 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 > **スリープに注意**：PCがスリープすると止まります。「設定 → システム → 電源」で、電源接続時はスリープしない設定にしてください。
 > また、Windows Update などで再起動したあとは、Windowsにログオンするまで起動しません。
 
+### 10. TikTokアカウントを作る
+6アカウント分のプロフィール（名前・ID・自己紹介・写真）の案と、収益化のための注意点を [docs/tiktok-accounts.md](docs/tiktok-accounts.md) にまとめています。写真は `assets\profile-icons\` にあります。
+
 ## 設定を変える
 
 | 変えたいもの | 場所 |
@@ -118,6 +121,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 npm run check          # 型チェック
 npm test               # テスト
 npm run video:studio   # 深海の試作をブラウザでプレビュー
+npm run icons          # プロフィール写真を assets/profile-icons/ に書き出す
 ```
 
 | フォルダ | 中身 |
@@ -131,5 +135,6 @@ npm run video:studio   # 深海の試作をブラウザでプレビュー
 | `config/accounts.yaml` | 6アカウントの設定 |
 | `video/kit/` | 動画の部品集（3D・計器・グラフ・字幕・共通の外枠）。使い方は `video/kit/KIT.md` |
 | `video/examples/` | 動画作成エージェントのお手本 |
+| `video/icons/` | アカウントのプロフィール写真の絵（書き出し先は `assets/profile-icons/`） |
 | `video/jobs/` | 1本ごとの作業フォルダ（自動で作られる） |
 | `public/bgm/` | アカウントごとのBGM |

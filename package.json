@@ -16,7 +16,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "video:studio": "remotion studio video/index.ts",
     "produce:dry": "tsx src/cli/produce.ts",
-    "video:sample": "tsx src/cli/renderSample.ts"
+    "video:sample": "tsx src/cli/renderSample.ts",
+    "icons": "tsx src/cli/renderIcons.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
