@@ -153,6 +153,14 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 
 > **Remotion のライセンス**：動画づくりに使っている Remotion は、個人と従業員3人以下の会社は無料、それより大きい会社は有料のライセンスが必要です。詳しくは https://www.remotion.dev/license を確認してください。
 
+## プログラムを最新にする
+PowerShellで `tiktok` フォルダに移動し、次を実行します（動いている `npm start` は Ctrl+C で止めてから）。
+```powershell
+.\update
+npm start
+```
+`git pull` で「package-lock.json would be overwritten」と出て止まるときも、これで直ります。
+
 ## 開発者向け
 
 ```powershell
