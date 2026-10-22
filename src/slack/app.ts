@@ -16,6 +16,7 @@ import {
   type Revision,
 } from "../production/pipeline.js";
 import { isPostLocked, Publisher, type PostingDeps } from "../posting/publisher.js";
+import { saveApprovedVideo } from "../production/exporter.js";
 import { extractTikTokUrls, fetchTikTokEmbed } from "../research/tiktokOembed.js";
 import type { Store } from "../store/store.js";
 import { formatJpDate } from "../util/date.js";
@@ -106,8 +107,16 @@ class SlackNotifier implements PlanNotifier, ProductionNotifier {
         channel: state.slack.channel,
         ts: p.slackReviewTs,
         text: "公開OKにしました",
-        blocks: reviewBlocks(date, account.id, p),
+        blocks: reviewBlocks(date, account, p),
       });
+      // 投稿文は、スマホで長押しコピーしやすいよう、それだけを1つのメッセージにする
+      const saved = p.saved;
+      if (saved?.status === "saved" && !saved.textPosted) {
+        await this.app.client.chat.postMessage({ ...thread, text: saved.text, mrkdwn: false });
+        await this.store.updateAccount(date, account.id, (s) => {
+          if (s.production?.saved) s.production.saved.textPosted = true;
+        });
+      }
       // 投稿の結果は、メッセージの更新だけだと気づけないのでスレッドでも知らせる
       const post = p.post;
       if (post && !post.notified && (post.status === "posted" || post.status === "failed" || post.status === "unknown")) {
@@ -133,7 +142,7 @@ class SlackNotifier implements PlanNotifier, ProductionNotifier {
         filename: basename(p.videoFile),
         title: `${account.name}（${p.version}回目）`,
       });
-      const res = await this.app.client.chat.postMessage({ ...thread, text: "動画ができました", blocks: reviewBlocks(date, account.id, p) });
+      const res = await this.app.client.chat.postMessage({ ...thread, text: "動画ができました", blocks: reviewBlocks(date, account, p) });
       await this.store.updateAccount(date, account.id, (s) => {
         if (s.production) s.production.slackReviewTs = res.ts!;
       });
@@ -190,7 +199,9 @@ export function createSlackBot(opts: {
   onRunRequested: () => Promise<void>;
   /** 動画づくりの設定 */
   production: Omit<ProductionDeps, "store" | "notifier">;
-  /** 投稿の設定（service が null なら手で投稿する） */
+  /** 公開OKにした動画と投稿文の保存先 */
+  exportDir: string;
+  /** 自動投稿の設定（service が null なら自動投稿しない） */
   posting: Omit<PostingDeps, "store" | "notifier">;
 }): SlackBot {
   const { slack, accounts, store } = opts;
@@ -199,6 +210,7 @@ export function createSlackBot(opts: {
   const deps: PlanningDeps = { store, notifier, accounts };
   const production = new ProductionQueue({ ...opts.production, store, notifier }, accounts);
   const publisher = new Publisher({ ...opts.posting, store, notifier }, accounts);
+  const save = (account: Account, date: string) => saveApprovedVideo({ store, notifier, exportDir: opts.exportDir }, account, date);
 
   /** 動画づくりを順番待ちに入れる（作り直しのときは revision を渡す） */
   const startProduction = async (date: string, account: Account, revision?: Revision): Promise<void> => {
@@ -285,7 +297,7 @@ export function createSlackBot(opts: {
   });
 
   // ---- 完成した動画の確認 ----
-  // 公開OKにしたら、そのアカウントの投稿時刻に投稿予約する
+  // 公開OKにしたら、動画と投稿文を保存する（自動投稿を使うときは、投稿時刻に予約もする）
   app.action<BlockAction<ButtonAction>>(ACTIONS.videoApprove, async ({ ack, action }) => {
     await ack();
     const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
@@ -297,7 +309,18 @@ export function createSlackBot(opts: {
       approvedNow = true;
     });
     await notifier.productionUpdated(v.d, account, state);
-    if (approvedNow) background("投稿", publisher.publish(account, v.d));
+    if (approvedNow) {
+      background(
+        "保存と投稿",
+        save(account, v.d).then(() => publisher.publish(account, v.d)),
+      );
+    }
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.saveRetry, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    background("保存のやり直し", save(findAccount(v.a), v.d));
   });
 
   app.action<BlockAction<ButtonAction>>(ACTIONS.postCancel, async ({ ack, action }) => {

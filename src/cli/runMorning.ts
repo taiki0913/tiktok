@@ -45,6 +45,7 @@ if (values["dry-run"]) {
     store,
     onRunRequested: async () => {},
     production: productionSettings(),
+    exportDir: env.EXPORT_DIR,
     posting: postingSettings(),
   }).deps;
 }

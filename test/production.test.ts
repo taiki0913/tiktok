@@ -94,7 +94,8 @@ test("Slack：動画の進み具合と、確認・失敗のメッセージ", () 
   assert.ok(isProductionBusy(base));
   assert.match(productionLine(base), /映像を作成中.*2回目/);
 
-  const review = reviewBlocks("2026-10-19", "cosmos", {
+  const cosmos = accounts.find((a) => a.id === "cosmos")!;
+  const review = reviewBlocks("2026-10-19", cosmos, {
     ...base,
     status: "review",
     durationSec: 72,
@@ -110,6 +111,6 @@ test("Slack：動画の進み具合と、確認・失敗のメッセージ", () 
   assert.match(text, new RegExp(ACTIONS.videoApprove));
   assert.match(text, new RegExp(ACTIONS.videoReviseOpen));
 
-  assert.doesNotMatch(JSON.stringify(reviewBlocks("d", "a", { ...base, status: "approved" })), /video_approve/);
+  assert.doesNotMatch(JSON.stringify(reviewBlocks("d", cosmos, { ...base, status: "approved" })), /video_approve/);
   assert.match(JSON.stringify(failureBlocks("d", "a", { ...base, status: "failed", error: "boom" })), /boom/);
 });

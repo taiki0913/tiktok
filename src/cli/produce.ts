@@ -8,6 +8,7 @@ import { loadAccounts, type Account } from "../config/accounts.js";
 import { env, requireClaudeEnv } from "../config/env.js";
 import type { AccountDayState } from "../domain.js";
 import { markQueued, produceVideo, type ProductionNotifier } from "../production/pipeline.js";
+import { postTextFor } from "../production/postText.js";
 import { productionSettings } from "../production/settings.js";
 import { productionLine } from "../slack/blocks.js";
 import { Store } from "../store/store.js";
@@ -65,6 +66,7 @@ if (p?.status === "review") {
   for (const f of p.factsToCheck ?? []) console.log(`⚠ 確認してほしい事実：${f.claim}（根拠：${f.basis}）`);
   for (const w of p.warnings) console.log(`⚠ ${w}`);
   if (p.costUsd != null) console.log(`映像づくりの費用の目安：約$${p.costUsd.toFixed(2)}`);
+  console.log(`\n📝 投稿文（説明文とハッシュタグ）：\n${postTextFor(proposal, p.script)}`);
 } else {
   console.error(`\n⚠ 完成しませんでした：${p?.error ?? p?.status}`);
   process.exitCode = 1;

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { loadAccounts } from "../src/config/accounts.js";
 import type { AccountDayState, ProductionState, Proposal } from "../src/domain.js";
-import { buildCaption, decidePostTime, Publisher } from "../src/posting/publisher.js";
+import { decidePostTime, Publisher } from "../src/posting/publisher.js";
 import { interpretStatus, readPublishRef, type PostCheck, type PostingService, type PublishRequest } from "../src/posting/uploadPost.js";
 import { ACTIONS, accountBlocks, productionLine, reviewBlocks } from "../src/slack/blocks.js";
 import { Store } from "../src/store/store.js";
@@ -79,10 +79,6 @@ async function setup(opts: { now: Date; service: FakeService | null; date?: stri
   const post = async () => (await store.getDay(date))?.accounts[cosmos.id]?.production?.post;
   return { dir, store, publisher, seen, post, setNow: (d: Date) => (now = d) };
 }
-
-test("投稿文：投稿文のあとに、#を付けてそろえたハッシュタグを並べる", () => {
-  assert.equal(buildCaption(proposal), "深海8000mの先に魚はいない\n\n#深海 #雑学 #宇宙のふしぎ");
-});
 
 test("投稿時刻：日本時間の投稿時刻に予約し、10分を切っていたらすぐ投稿する", () => {
   assert.equal(at("20:00").toISOString(), "2026-10-22T11:00:00.000Z");
@@ -203,11 +199,12 @@ test("予約を取り消せる。予約時刻を過ぎたら結果を確かめ�
   }
 });
 
-test("投稿サービスが未設定なら『手で投稿』にする。定期確認では今日の分だけ投稿を続ける", async () => {
+test("投稿サービスが未設定なら自動投稿しない。定期確認では今日の分だけ投稿を続ける", async () => {
   const t = await setup({ now: at("09:00"), service: null });
   try {
     await t.publisher.publish(cosmos, DATE);
-    assert.equal((await t.post())?.status, "manual");
+    await t.publisher.tick();
+    assert.equal(await t.post(), undefined);
   } finally {
     await rm(t.dir, { recursive: true, force: true });
   }
@@ -230,16 +227,15 @@ test("投稿サービスが未設定なら『手で投稿』にする。定期�
 test("Slack：予約・投稿済み・失敗の表示と、予約後は決定を取り消せないこと", () => {
   const base: ProductionState = { status: "approved", version: 1, warnings: [], revisions: [], videoFile: "data/videos/x.mp4" };
   const scheduled = { ...base, post: { status: "scheduled" as const, attempt: 1, scheduledAt: at("20:00").toISOString(), jobId: "j" } };
-  const text = JSON.stringify(reviewBlocks(DATE, "cosmos", scheduled));
+  const text = JSON.stringify(reviewBlocks(DATE, cosmos, scheduled));
   assert.match(text, /10\/22\(木\) 20:00 にTikTokへ投稿予約しました/);
   assert.match(text, new RegExp(ACTIONS.postCancel));
   assert.match(productionLine(scheduled), /20:00/);
 
   const posted = { ...base, post: { status: "posted" as const, attempt: 1, url: "https://www.tiktok.com/@a/video/1" } };
-  assert.match(JSON.stringify(reviewBlocks(DATE, "cosmos", posted)), /video\/1/);
+  assert.match(JSON.stringify(reviewBlocks(DATE, cosmos, posted)), /video\/1/);
   const failed = { ...base, post: { status: "failed" as const, attempt: 1, error: "boom" } };
-  assert.match(JSON.stringify(reviewBlocks(DATE, "cosmos", failed)), new RegExp(`boom.*${ACTIONS.postRetry}`));
-  assert.match(JSON.stringify(reviewBlocks(DATE, "cosmos", { ...base, post: { status: "manual", attempt: 1 } })), /手で投稿/);
+  assert.match(JSON.stringify(reviewBlocks(DATE, cosmos, failed)), new RegExp(`boom.*${ACTIONS.postRetry}`));
 
   const state = (p: ProductionState): AccountDayState => ({
     accountId: "cosmos",

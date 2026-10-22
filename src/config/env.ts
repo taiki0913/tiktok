@@ -28,7 +28,9 @@ const EnvSchema = z.object({
   REMOTION_GL: z.enum(["angle", "egl", "swiftshader", "swangle", "vulkan", "angle-egl"]).optional(),
   RENDER_CONCURRENCY: z.coerce.number().int().positive().optional(),
 
-  // 投稿（Upload-Post）。未設定なら公開OKのあとは手で投稿する
+  // 公開OKにした動画と投稿文の保存先（Googleドライブのフォルダなど）
+  EXPORT_DIR: z.string().default("export"),
+  // 自動投稿（Upload-Post）。未設定なら自動投稿しない
   UPLOAD_POST_API_KEY: z.string().optional(),
 
   MORNING_CRON: z.string().default("30 6 * * *"),

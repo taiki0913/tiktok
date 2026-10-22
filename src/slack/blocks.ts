@@ -3,7 +3,7 @@ import type { types as Slack } from "@slack/bolt";
 import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
 import { env } from "../config/env.js";
-import type { AccountDayState, DayState, PostState, ProductionState, Proposal } from "../domain.js";
+import type { AccountDayState, DayState, PostState, ProductionState, Proposal, SavedState } from "../domain.js";
 import { isPostLocked } from "../posting/publisher.js";
 import { formatJpDate, formatJpDateTime } from "../util/date.js";
 
@@ -19,6 +19,7 @@ export const ACTIONS = {
   videoRetry: "video_retry",
   postCancel: "post_cancel",
   postRetry: "post_retry",
+  saveRetry: "save_retry",
 } as const;
 export const REVISE_CALLBACK = "revise_submit";
 export const VIDEO_REVISE_CALLBACK = "video_revise_submit";
@@ -102,7 +103,7 @@ export function productionLine(p?: ProductionState): string {
     case "review":
       return "🎬 動画ができました。このメッセージのスレッドで確認してください";
     case "approved":
-      return postLine(p.post);
+      return p.post ? postLine(p.post) : savedLine(p.saved);
     case "failed":
       return "⚠️ 動画の作成に失敗しました。スレッドを確認してください";
     case "unsupported":
@@ -112,14 +113,23 @@ export function productionLine(p?: ProductionState): string {
 
 const postTime = (post: PostState): string => (post.scheduledAt ? formatJpDateTime(post.scheduledAt, env.TIMEZONE) : "");
 
-/** 公開OKのあとの、投稿の進み具合 */
-function postLine(post?: PostState): string {
-  switch (post?.status) {
+/** 公開OKのあとの、保存の結果 */
+function savedLine(saved?: SavedState): string {
+  switch (saved?.status) {
     case undefined:
+      return "✅ 動画：公開OK（保存中…）";
+    case "saved":
+      return "📁 動画：公開OK・保存しました（投稿文はスレッドにあります）";
+    case "failed":
+      return "⚠️ 動画の保存に失敗しました。スレッドを確認してください";
+  }
+}
+
+/** 公開OKのあとの、自動投稿の進み具合 */
+function postLine(post: PostState): string {
+  switch (post.status) {
     case "scheduling":
-      return "✅ 動画：公開OK（投稿の準備中…）";
-    case "manual":
-      return "✅ 動画：公開OK（投稿サービスが未設定のため、手で投稿してください）";
+      return "📤 TikTokへの投稿を準備中…";
     case "scheduled":
       return `📅 ${postTime(post)} にTikTokへ投稿予約済み`;
     case "posting":
@@ -136,8 +146,7 @@ function postLine(post?: PostState): string {
 }
 
 const POST_SHORT: Record<PostState["status"], string> = {
-  scheduling: "🎬公開OK",
-  manual: "🎬公開OK（手で投稿）",
+  scheduling: "📤投稿準備中",
   scheduled: "📅投稿予約済み",
   posting: "📤投稿中",
   posted: "🎉投稿済み",
@@ -150,6 +159,7 @@ const POST_SHORT: Record<PostState["status"], string> = {
 function productionShort(p?: ProductionState): string {
   if (!p) return "";
   if (p.status === "approved" && p.post) return `　${POST_SHORT[p.post.status]}`;
+  if (p.status === "approved" && p.saved) return p.saved.status === "saved" ? "　📁保存済み" : "　⚠️保存失敗";
   const label: Record<ProductionState["status"], string> = {
     queued: "🎬順番待ち",
     scripting: "🎬制作中",
@@ -165,9 +175,9 @@ function productionShort(p?: ProductionState): string {
 }
 
 /** スレッドに出す、完成した動画の確認メッセージ */
-export function reviewBlocks(date: string, accountId: string, p: ProductionState): Slack.KnownBlock[] {
-  const v = { d: date, a: accountId };
-  if (p.status === "approved") return approvedBlocks(v, p);
+export function reviewBlocks(date: string, account: Account, p: ProductionState): Slack.KnownBlock[] {
+  const v = { d: date, a: account.id };
+  if (p.status === "approved") return approvedBlocks(v, account, p);
   const blocks: Slack.KnownBlock[] = [
     mrkdwn(`🎬 *動画ができました*（約${p.durationSec ?? "?"}秒・${p.version}回目）\n${p.agentSummary ?? ""}`),
   ];
@@ -189,26 +199,41 @@ export function reviewBlocks(date: string, accountId: string, p: ProductionState
   return blocks;
 }
 
-/** 公開OKにしたあとの確認メッセージ：投稿の予約・結果と、取り消し・やり直しのボタン */
-function approvedBlocks(v: { d: string; a: string }, p: ProductionState): Slack.KnownBlock[] {
-  const post = p.post;
-  switch (post?.status) {
-    case undefined:
+/** 公開OKにしたあとの確認メッセージ：保存先と、（自動投稿を使うときは）投稿の予約・結果 */
+function approvedBlocks(v: { d: string; a: string }, account: Account, p: ProductionState): Slack.KnownBlock[] {
+  const saved = p.saved;
+  const blocks: Slack.KnownBlock[] = [];
+  if (!saved) {
+    blocks.push(mrkdwn("✅ *公開OKにしました*\n📁 動画を保存しています…"));
+  } else if (saved.status === "saved") {
+    blocks.push(
+      mrkdwn(
+        `✅ *公開OKにしました*\n📁 保存しました：\`${saved.videoFile ?? ""}\`\n🕖 投稿の目安：${account.postTime}\n📝 投稿文（説明文とハッシュタグ）は、同じ名前の .txt と、この下のメッセージにあります（長押しでコピーできます）`,
+      ),
+    );
+  } else {
+    blocks.push(
+      mrkdwn(`✅ *公開OKにしました*\n⚠️ *動画を保存できませんでした*\n\`\`\`${truncate(saved.error ?? "不明なエラー", 1000)}\`\`\``),
+      { type: "actions", elements: [button("📁 もう一度保存する", ACTIONS.saveRetry, v, "primary")] },
+    );
+  }
+  if (p.post) blocks.push(...postBlocks(v, p.post));
+  return blocks;
+}
+
+/** 自動投稿（UPLOAD_POST_API_KEY を設定したときだけ）の予約・結果と、取り消し・やり直しのボタン */
+function postBlocks(v: { d: string; a: string }, post: PostState): Slack.KnownBlock[] {
+  switch (post.status) {
     case "scheduling":
-      return [mrkdwn("✅ *公開OKにしました*\n📤 投稿サービスにアップロードしています…")];
-    case "manual":
-      return [
-        mrkdwn(`✅ *公開OKにしました*\n投稿サービス（Upload-Post）が未設定なので、TikTokへは手で投稿してください。\n動画：\`${p.videoFile ?? ""}\``),
-        { type: "actions", elements: [button("📤 投稿サービスで投稿する", ACTIONS.postRetry, v)] },
-      ];
+      return [context("📤 投稿サービスにアップロードしています…")];
     case "scheduled":
       return [
-        mrkdwn(`✅ *公開OKにしました*\n📅 *${postTime(post)} にTikTokへ投稿予約しました*（その時刻にPCが止まっていても投稿されます）`),
+        mrkdwn(`📅 *${postTime(post)} にTikTokへ投稿予約しました*（その時刻にPCが止まっていても投稿されます）`),
         ...(post.error ? [context(`⚠️ ${post.error}`)] : []),
         { type: "actions", elements: [button("⏹ 予約を取り消す", ACTIONS.postCancel, v, "danger")] },
       ];
     case "posting":
-      return [mrkdwn("✅ *公開OKにしました*\n📤 投稿時刻を過ぎていたので、すぐにTikTokへ投稿しています…")];
+      return [mrkdwn("📤 投稿時刻を過ぎていたので、すぐにTikTokへ投稿しています…")];
     case "posted":
       return [mrkdwn(`🎉 *TikTokに投稿しました*${post.url ? `\n<${post.url}|投稿した動画を見る>` : ""}`)];
     case "failed":

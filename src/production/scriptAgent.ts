@@ -25,6 +25,12 @@ export const VideoScriptSchema = z.object({
     )
     .describe("6〜12場面。1場面は5〜10秒の分量"),
   endQuestion: z.string().describe("最後に画面に出す、コメントを促す問いかけ"),
+  postCaption: z
+    .string()
+    .describe("TikTokの投稿文（説明文）。ハッシュタグは含めない。1〜3文で、続きが気になる一言かコメントを促す問いかけを入れる"),
+  hashtags: z
+    .array(z.string())
+    .describe("投稿に付けるハッシュタグ。4〜6個。#は付けない。ジャンルの定番のタグと、この動画の題材のタグを混ぜる"),
   sources: z.array(z.string()).describe("画面の最後に小さく出す出典（機関名・資料名）"),
   facts: z
     .array(
@@ -55,6 +61,10 @@ function systemPrompt(account: Account): string {
 - 映像の指示は「動画の作り方」で実際に作れるものだけにする。実写・写真・実在の映像は使えない。
 - 事実・説・推測の区別は字幕のラベル（「通説」「新説」「想像図」など）で一度示せば十分。読み上げで断り書きをくり返さない。
 - 最後は問いかけ（endQuestion）で締める。
+
+# 投稿文
+- postCaption と hashtags は、企画の投稿文（caption・hashtags）をもとに、完成した台本の内容に合わせて書く。
+- 投稿文には答えやオチを書かない（動画を見たくなるようにする）。
 
 # 事実の扱い
 - 確かだと言える事実と数値だけを使う。数字を作らない。自信のない事実は、使わずに言い換えるのを優先する。

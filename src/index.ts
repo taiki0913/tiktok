@@ -1,5 +1,6 @@
 // 常駐プロセス：Slack ボットを起動し、毎朝決まった時刻に企画づくりを実行する。
 //   npm start
+import { resolve } from "node:path";
 import cron from "node-cron";
 import { loadAccounts } from "./config/accounts.js";
 import { env, requireClaudeEnv, requireSlackEnv } from "./config/env.js";
@@ -42,6 +43,7 @@ const bot = createSlackBot({
   store,
   onRunRequested: () => runToday("Slackで「企画作成」"),
   production: productionSettings(),
+  exportDir: env.EXPORT_DIR,
   posting: postingSettings(),
 });
 await bot.app.start();
@@ -53,7 +55,8 @@ if (resumed > 0) console.log(`[produce] 作りかけの動画 ${resumed} 本の�
 
 // 投稿の結果を定期的に確かめる（公開OKの直後に止まった投稿の続きもここで行う）
 bot.publisher.start();
-console.log(env.UPLOAD_POST_API_KEY ? "[post] 公開OKの動画は Upload-Post で投稿予約します" : "[post] UPLOAD_POST_API_KEY が未設定のため、公開OKの動画は手で投稿してください");
+console.log(`[save] 公開OKの動画と投稿文の保存先: ${resolve(env.EXPORT_DIR)}`);
+if (env.UPLOAD_POST_API_KEY) console.log("[post] 公開OKの動画は Upload-Post で投稿予約します");
 
 const task = cron.schedule(env.MORNING_CRON, () => runToday("定時実行"), {
   timezone: env.TIMEZONE,

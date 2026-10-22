@@ -86,8 +86,22 @@ export interface ProductionState {
   revisions: { instruction: string; mode: "script" | "visual"; at: string }[];
   /** スレッドに投稿した確認メッセージ */
   slackReviewTs?: string;
-  /** TikTok への投稿（公開OKのあと） */
+  /** 公開OKにした動画の保存先（EXPORT_DIR） */
+  saved?: SavedState;
+  /** TikTok への自動投稿（UPLOAD_POST_API_KEY を設定したときだけ） */
   post?: PostState;
+}
+
+export interface SavedState {
+  status: "saved" | "failed";
+  videoFile?: string;
+  /** 投稿文を書いたテキストファイル */
+  textFile?: string;
+  /** 投稿文（説明文＋ハッシュタグ） */
+  text: string;
+  error?: string;
+  /** 投稿文をスレッドに送ったか */
+  textPosted?: boolean;
 }
 
 export type PostStatus =
@@ -97,8 +111,7 @@ export type PostStatus =
   | "posted"
   | "failed"
   | "canceled"
-  | "unknown" // 結果を確認できなかった
-  | "manual"; // 投稿サービスが未設定。手で投稿する
+  | "unknown"; // 結果を確認できなかった
 
 export interface PostState {
   status: PostStatus;

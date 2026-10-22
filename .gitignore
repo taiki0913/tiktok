@@ -4,6 +4,7 @@ data/
 *.log
 logs/
 out/
+export/
 video/jobs/
 video/examples/*/stills/
 video/examples/*/public/

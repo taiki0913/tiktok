@@ -1,8 +1,9 @@
 // 公開OKになった動画を、アカウントの投稿時刻（accounts.yaml の postTime）に投稿予約し、結果を確かめる。
 // 予約はアップロードした時点で投稿サービス側に入るので、投稿時刻に PC が止まっていても投稿される。
 import type { Account } from "../config/accounts.js";
-import type { PostState, Proposal } from "../domain.js";
+import type { PostState } from "../domain.js";
 import type { ProductionNotifier } from "../production/pipeline.js";
+import { postTextFor } from "../production/postText.js";
 import type { Store } from "../store/store.js";
 import { dateInTz, daysBefore, zonedTimeToUtc } from "../util/date.js";
 import type { PostingService, PublishRequest } from "./uploadPost.js";
@@ -19,15 +20,9 @@ const CHECK_INTERVAL_MS = 5 * 60_000;
 /** この状態の投稿があるうちは、新しく投稿しない（二重投稿を防ぐ） */
 const LOCKED: PostState["status"][] = ["scheduling", "scheduled", "posting", "posted"];
 /** やり直しボタンで、もう一度投稿してよい状態 */
-const RETRYABLE: PostState["status"][] = ["failed", "canceled", "unknown", "manual"];
+const RETRYABLE: PostState["status"][] = ["failed", "canceled", "unknown"];
 
 export const isPostLocked = (post?: PostState): boolean => !!post && LOCKED.includes(post.status);
-
-/** TikTok の投稿文：企画の投稿文＋ハッシュタグ */
-export function buildCaption(p: Proposal): string {
-  const tags = [...new Set(p.hashtags.map((h) => h.replace(/^#+/, "").replace(/\s+/g, "")).filter(Boolean))].map((h) => `#${h}`);
-  return [p.caption.trim(), tags.join(" ")].filter(Boolean).join("\n\n").slice(0, 2200);
-}
 
 /** いつ投稿するか。その日の投稿時刻が十分先ならその時刻、過ぎていれば null（すぐ投稿） */
 export function decidePostTime(date: string, postTime: string, now: Date, timeZone: string): Date | null {
@@ -38,7 +33,7 @@ export function decidePostTime(date: string, postTime: string, now: Date, timeZo
 export interface PostingDeps {
   store: Store;
   notifier: ProductionNotifier;
-  /** null なら投稿サービスが未設定（公開OKのあとは手で投稿する） */
+  /** null なら投稿サービスが未設定（自動投稿しない） */
   service: PostingService | null;
   timeZone: string;
   now?: () => Date;
@@ -80,6 +75,7 @@ export class Publisher {
 
   private async publishOnce(account: Account, date: string, retry: boolean): Promise<void> {
     const { store, service, timeZone } = this.deps;
+    if (!service) return;
     // updateAccount の中で決めたことを外へ持ち出す
     const plan: { changed?: boolean; request?: PublishRequest } = {};
     await store.updateAccount(date, account.id, (s) => {
@@ -93,17 +89,13 @@ export class Publisher {
       else if (retry && RETRYABLE.includes(prev.status)) attempt = prev.attempt + 1;
       else return;
       plan.changed = true;
-      if (!service) {
-        p.post = { status: "manual", attempt };
-        return;
-      }
       const now = this.now();
       const at = decidePostTime(date, account.postTime, now, timeZone);
       p.post = { status: "scheduling", attempt, scheduledAt: (at ?? now).toISOString() };
       plan.request = {
         profile: account.id,
         videoFile: p.videoFile,
-        caption: buildCaption(proposal),
+        caption: postTextFor(proposal, p.script),
         ...(at ? { scheduledAt: at } : {}),
         aigc: account.production === "ai_video",
         idempotencyKey: `${p.jobId}-post${attempt}`,
@@ -113,7 +105,7 @@ export class Publisher {
     if (!plan.changed) return;
     await this.notify(date, account);
     const request = plan.request;
-    if (!request || !service) return;
+    if (!request) return;
     const immediate = !request.scheduledAt;
 
     try {
