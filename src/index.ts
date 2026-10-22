@@ -9,7 +9,7 @@ import { postingSettings } from "./posting/settings.js";
 import { productionSettings } from "./production/settings.js";
 import { createSlackBot } from "./slack/app.js";
 import { Store } from "./store/store.js";
-import { dateInTz, hourInTz } from "./util/date.js";
+import { dateInTz, daysBefore, hourInTz } from "./util/date.js";
 
 /** これより遅い時刻に起動した日は、取り戻し実行をしない（夜に企画が届いても使えないため） */
 const CATCH_UP_UNTIL_HOUR = 15;
@@ -48,6 +48,11 @@ const bot = createSlackBot({
 });
 await bot.app.start();
 console.log(`[slack] 接続しました（アカウント数: ${accounts.length}）`);
+
+// 昨日と今日のメッセージを、今のプログラムの表示に描き直す（更新で増えたボタンなどを出すため）
+for (const date of [daysBefore(today(), 1), today()]) {
+  await bot.refreshDay(date).catch((e) => console.warn(`[slack] ${date} のメッセージを描き直せませんでした`, e));
+}
 
 // 前回の終了時に作りかけだった動画があれば、続きから作る
 const resumed = await bot.production.resume(today());

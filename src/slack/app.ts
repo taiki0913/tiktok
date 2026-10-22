@@ -189,6 +189,8 @@ export interface SlackBot {
   deps: PlanningDeps;
   production: ProductionQueue;
   publisher: Publisher;
+  /** その日のメッセージを、今のプログラムの表示（ボタンなど）に描き直す */
+  refreshDay: (date: string) => Promise<void>;
 }
 
 export function createSlackBot(opts: {
@@ -412,5 +414,13 @@ export function createSlackBot(opts: {
     console.error("[slack] エラー", e);
   });
 
-  return { app, deps, production, publisher };
+  const refreshDay = async (date: string): Promise<void> => {
+    const day = await store.getDay(date);
+    for (const account of accounts) {
+      const state = day?.accounts[account.id];
+      if (state?.slack) await notifier.accountUpdated(date, account, state);
+    }
+  };
+
+  return { app, deps, production, publisher, refreshDay };
 }

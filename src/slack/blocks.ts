@@ -338,10 +338,14 @@ export function accountBlocks(
         mrkdwn(p ? `✅ *案${proposalLetter(i)}「${p.title}」に決定*\n${p.summary}` : "✅ 決定済み"),
         context(productionLine(state.production)),
       );
+      const actions: Slack.Button[] = [];
+      // 失敗したときは、スレッドを開かなくてもやり直せるようにする
+      if (state.production?.status === "failed") actions.push(button("🔄 動画をもう一度作る", ACTIONS.videoRetry, v, "primary"));
       // 動画づくりの途中や、投稿の予約・投稿のあとは取り消せない（作りかけ・予約済みのものと食い違わないように）
       if (!isProductionBusy(state.production) && !isPostLocked(state.production?.post)) {
-        blocks.push({ type: "actions", elements: [button("↩️ 決定を取り消す", ACTIONS.undo, v)] });
+        actions.push(button("↩️ 決定を取り消す", ACTIONS.undo, v));
       }
+      if (actions.length > 0) blocks.push({ type: "actions", elements: actions });
       break;
     }
 

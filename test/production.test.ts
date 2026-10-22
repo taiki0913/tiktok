@@ -7,7 +7,7 @@ import { loadAccounts } from "../src/config/accounts.js";
 import type { AccountDayState, ProductionState } from "../src/domain.js";
 import { markQueued, pickBgm, produceVideo, type ProductionNotifier } from "../src/production/pipeline.js";
 import { VoicevoxClient } from "../src/production/voicevox.js";
-import { ACTIONS, failureBlocks, isProductionBusy, productionLine, reviewBlocks } from "../src/slack/blocks.js";
+import { accountBlocks, ACTIONS, failureBlocks, isProductionBusy, productionLine, reviewBlocks } from "../src/slack/blocks.js";
 import { Store } from "../src/store/store.js";
 import { computeTimeline, DEFAULT_TIMELINE } from "../video/kit/job.js";
 
@@ -80,6 +80,21 @@ test("失敗した回を指示なしでやり直すと、その回のジョブ�
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("Slack：動画づくりに失敗したら、企画のメッセージにも『もう一度作る』ボタンを出す", () => {
+  const cosmos = accounts.find((a) => a.id === "cosmos")!;
+  const state = (status: ProductionState["status"]): AccountDayState => ({
+    accountId: "cosmos",
+    status: "approved",
+    selectedIndex: 0,
+    proposals: [{ title: "t", hook: "h", summary: "s", outline: [], lengthSec: 70, caption: "c", hashtags: [], basedOn: "b", originality: "o" }],
+    production: { status, version: 1, warnings: [], revisions: [] },
+    revisions: [],
+    updatedAt: "",
+  });
+  assert.match(JSON.stringify(accountBlocks("d", cosmos, 2, state("failed"))), new RegExp(ACTIONS.videoRetry));
+  assert.doesNotMatch(JSON.stringify(accountBlocks("d", cosmos, 2, state("coding"))), new RegExp(ACTIONS.videoRetry));
 });
 
 test("漫画・AI映像のアカウントは『準備中』になり、Claude を呼ばない", async () => {
