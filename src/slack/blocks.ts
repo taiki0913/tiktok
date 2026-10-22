@@ -101,7 +101,7 @@ export function productionLine(p?: ProductionState): string {
     case "rendering":
       return `🎬 動画：書き出し中…${v}`;
     case "review":
-      return "🎬 動画ができました。このメッセージのスレッドで確認してください";
+      return "🎬 動画ができました。スレッドで動画を見て、よければ「✅ 公開OK」を押してください（公開OKでGoogleドライブに保存されます）";
     case "approved":
       return p.post ? postLine(p.post) : savedLine(p.saved);
     case "failed":
@@ -339,7 +339,10 @@ export function accountBlocks(
         context(productionLine(state.production)),
       );
       const actions: Slack.Button[] = [];
-      // 失敗したときは、スレッドを開かなくてもやり直せるようにする
+      // 確認待ち・失敗のときは、スレッドを開かなくても操作できるようにする（動画そのものはスレッドにある）
+      if (state.production?.status === "review") {
+        actions.push(button("✅ 公開OK", ACTIONS.videoApprove, v, "primary"), button("✏️ 作り直す", ACTIONS.videoReviseOpen, v));
+      }
       if (state.production?.status === "failed") actions.push(button("🔄 動画をもう一度作る", ACTIONS.videoRetry, v, "primary"));
       // 動画づくりの途中や、投稿の予約・投稿のあとは取り消せない（作りかけ・予約済みのものと食い違わないように）
       if (!isProductionBusy(state.production) && !isPostLocked(state.production?.post)) {

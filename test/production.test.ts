@@ -95,6 +95,7 @@ test("Slack：動画づくりに失敗したら、企画のメッセージにも
   });
   assert.match(JSON.stringify(accountBlocks("d", cosmos, 2, state("failed"))), new RegExp(ACTIONS.videoRetry));
   assert.doesNotMatch(JSON.stringify(accountBlocks("d", cosmos, 2, state("coding"))), new RegExp(ACTIONS.videoRetry));
+  assert.match(JSON.stringify(accountBlocks("d", cosmos, 2, state("review"))), new RegExp(ACTIONS.videoApprove));
 });
 
 test("漫画・AI映像のアカウントは『準備中』になり、Claude を呼ばない", async () => {
