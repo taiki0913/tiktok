@@ -29,7 +29,7 @@
 
 ## プロフィールの案
 
-写真は `assets/profile-icons/` にあります（1080×1080。TikTok では丸く切り抜かれます）。作り直すときは `npm run icons` を実行してください。絵は `video/icons/` で作っています。
+写真は画像生成AIで作ります。プロンプトは [icon-prompts.md](icon-prompts.md) にあります（TikTok では丸く切り抜かれます）。`assets/profile-icons/` の写真は、プログラムで作った仮のものです。
 
 | アカウント | 名前 | ID の候補（上から順に試す） | 自己紹介 | 写真 |
 |---|---|---|---|---|
