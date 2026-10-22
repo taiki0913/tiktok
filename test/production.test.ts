@@ -59,6 +59,29 @@ test("作り直すたびに版が進み、指示と前回の台本を引き継�
   }
 });
 
+test("失敗した回を指示なしでやり直すと、その回のジョブを引き継ぐ（指示つきの作り直しは引き継がない）", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "store-"));
+  try {
+    const store = new Store(dir);
+    await markQueued(store, "2026-10-19", "cosmos");
+    await store.updateAccount("2026-10-19", "cosmos", (s) => {
+      s.production!.status = "failed";
+      s.production!.jobId = "2026-10-19-cosmos-v1";
+    });
+    const retry = await markQueued(store, "2026-10-19", "cosmos");
+    assert.equal(retry.production?.retryOf, "2026-10-19-cosmos-v1");
+    assert.equal(retry.production?.version, 2);
+
+    await store.updateAccount("2026-10-19", "cosmos", (s) => {
+      s.production!.status = "review";
+    });
+    const revised = await markQueued(store, "2026-10-19", "cosmos", { instruction: "暗くして", mode: "visual" });
+    assert.equal(revised.production?.retryOf, undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("漫画・AI映像のアカウントは『準備中』になり、Claude を呼ばない", async () => {
   const dir = await mkdtemp(join(tmpdir(), "store-"));
   try {

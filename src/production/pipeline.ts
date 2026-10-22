@@ -10,7 +10,7 @@ import { computeTimeline, DEFAULT_TIMELINE, type JobData } from "../../video/kit
 import { writeJobFiles } from "./jobFiles.js";
 import { JobRenderer, type RenderSettings } from "./renderer.js";
 import { factsToCheck, runScriptAgent, type VideoScript } from "./scriptAgent.js";
-import { runVideoAgent } from "./videoAgent.js";
+import { runVideoAgent, verifyJobCode, type VideoAgentResult } from "./videoAgent.js";
 import { narrate, type VoicevoxClient } from "./voicevox.js";
 
 const PROJECT = process.cwd();
@@ -56,6 +56,8 @@ export async function pickBgm(accountId: string, seed: string, bgmDir = BGM_DIR)
 export async function markQueued(store: Store, date: string, accountId: string, revision?: Revision): Promise<AccountDayState> {
   return store.updateAccount(date, accountId, (s) => {
     const prev = s.production;
+    // 失敗した回を指示なしでやり直すときは、その回の台本と映像のコードから続ける
+    const retryOf = !revision && prev?.status === "failed" ? prev.jobId : undefined;
     s.production = {
       status: "queued",
       version: prev ? prev.version + 1 : 1,
@@ -63,6 +65,7 @@ export async function markQueued(store: Store, date: string, accountId: string, 
       revisions: [...(prev?.revisions ?? []), ...(revision ? [{ ...revision, at: new Date().toISOString() }] : [])],
       script: prev?.script,
       jobId: prev?.jobId,
+      ...(retryOf ? { retryOf } : {}),
     };
   });
 }
@@ -106,8 +109,10 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       p.jobId = jobId;
       delete p.error;
     });
+    // 映像だけの作り直しと、失敗した回のやり直しは、前回の台本をそのまま使う
+    const carryCode = revision?.mode === "visual" || !!prev.retryOf;
     let script: VideoScript;
-    if (revision?.mode === "visual" && prev.script) {
+    if (carryCode && prev.script) {
       script = prev.script;
     } else {
       script = await runScriptAgent({
@@ -167,11 +172,16 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       visual: account.visual,
     };
     await writeJobFiles(jobDir, job);
-    // 映像だけの作り直しは、前回のコードを引き継いでから直させる
-    if (revision?.mode === "visual" && prev.jobId && prev.jobId !== jobId) {
-      const prevDir = join(JOBS_DIR, prev.jobId);
+    // 映像だけの作り直しと、失敗した回のやり直しは、前回のコードを引き継ぐ
+    const fromJob = prev.retryOf ?? prev.jobId;
+    let carried = false;
+    if (carryCode && fromJob && fromJob !== jobId) {
+      const prevDir = join(JOBS_DIR, fromJob);
       for (const f of await readdir(prevDir).catch(() => [] as string[])) {
-        if (/\.tsx?$/.test(f) && f !== "entry.tsx") await cp(join(prevDir, f), join(jobDir, f));
+        if (/\.tsx?$/.test(f) && f !== "entry.tsx") {
+          await cp(join(prevDir, f), join(jobDir, f));
+          if (f === "Video.tsx") carried = true;
+        }
       }
     }
 
@@ -181,14 +191,37 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       p.warnings = warnings;
       p.voiceCredit = narration.credit;
     });
-    const agent = await runVideoAgent({ account, job, jobDir, renderer, revision: revision?.instruction });
-    if (!agent.finished) throw new Error("映像が完成しませんでした（エージェントとのやりとりが上限に達しました）");
+    let agent: VideoAgentResult;
+    if (prev.retryOf && carried && !(await verifyJobCode(jobId, renderer))) {
+      // 失敗した回のコードがそのまま動くなら、エージェントを使わずに書き出す（費用がかからない）
+      agent = { finished: true, stop: "finished", summary: "前回止まったところの映像のコードで書き出しました。", costUsd: 0 };
+    } else {
+      agent = await runVideoAgent({
+        account,
+        job,
+        jobDir,
+        renderer,
+        revision:
+          revision?.instruction ??
+          (prev.retryOf && carried ? "前回は途中で止まりました。今のコードを確認してエラーや見た目の問題を直し、仕上げてください。" : undefined),
+      });
+    }
+    if (!agent.finished) {
+      // finish の合図がなくても、コードが動くなら書き出して、オーナーに見てもらう
+      const problem = await verifyJobCode(jobId, renderer);
+      if (problem) {
+        const why = agent.stop === "limit" ? "やりとりの上限に達しても" : "動画作成エージェントが途中で止まり、";
+        throw new Error(`${why}映像のコードが完成しませんでした。「もう一度作る」で続きから作れます。\n${problem}`);
+      }
+      warnings.push("動画作成エージェントが完了の合図を出さずに止まったため、最後のコードで書き出しました。見た目を確認してください");
+    }
 
     // 5. 書き出し
     await setState((p) => {
       p.status = "rendering";
       p.agentSummary = agent.summary;
       p.costUsd = agent.costUsd;
+      p.warnings = warnings;
     });
     await mkdir(deps.videosDir, { recursive: true });
     const videoFile = join(deps.videosDir, `${jobId}.mp4`);

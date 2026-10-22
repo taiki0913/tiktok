@@ -88,6 +88,8 @@ export interface ProductionState {
   revisions: { instruction: string; mode: "script" | "visual"; at: string }[];
   /** スレッドに投稿した確認メッセージ */
   slackReviewTs?: string;
+  /** 失敗した回のやり直しなら、その回のジョブID（台本と映像のコードを引き継ぐ） */
+  retryOf?: string;
   /** 公開OKにした動画の保存先（EXPORT_DIR） */
   saved?: SavedState;
   /** TikTok への自動投稿（UPLOAD_POST_API_KEY を設定したときだけ） */

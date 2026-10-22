@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, normalize, relative, resolve } from "node:path";
 import { promisify } from "node:util";
+import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
@@ -21,9 +22,19 @@ const MAX_TEXT = 60_000;
 
 export interface VideoAgentResult {
   finished: boolean;
+  /** finish を呼ばずに終わったとき：no_finish＝自分で返事を終えた、limit＝やりとりの上限に達した */
+  stop: "finished" | "no_finish" | "limit";
   summary: string;
   costUsd: number | null;
 }
+
+/** エージェントとのやりとりの上限 */
+const MAX_ITERATIONS = 30;
+/** finish を呼ばずに返事を終えたときに、何回まで促すか */
+const MAX_NUDGES = 2;
+const NUDGE =
+  "まだ finish が呼ばれていないので、作業が終わったと判断できません。今の Video.tsx で問題がなければ、すぐに finish を呼んでください。" +
+  "直すところがあれば直して check してから finish を呼んでください。テキストの返事だけで終えないでください。";
 
 const isInside = (dir: string, target: string): boolean => {
   const rel = relative(dir, target);
@@ -47,6 +58,21 @@ function resolveReadable(jobDir: string, path: string): string {
   return full;
 }
 
+/** 映像のコードが型チェックと組み立てを通るか。通らなければエラーの内容を返す */
+export async function verifyJobCode(
+  jobId: string,
+  renderer: Pick<JobRenderer, "ensureBundle">,
+): Promise<string | null> {
+  const errors = await typecheck(jobId);
+  if (errors.length > 0) return `型エラー:\n${errors.slice(0, 40).join("\n")}`;
+  try {
+    await renderer.ensureBundle();
+  } catch (e) {
+    return `組み立てエラー:\n${String((e as Error).message).slice(0, 4000)}`;
+  }
+  return null;
+}
+
 async function typecheck(jobId: string): Promise<string[]> {
   const tsc = join(ROOT, "node_modules", "typescript", "bin", "tsc");
   try {
@@ -68,7 +94,7 @@ function systemPrompt(kitGuide: string): string {
 3. check で型と組み立てのエラーを確認し、エラーがなくなるまで直す。
 4. render_frames で各場面の中ほどと見せ場のフレームを静止画にして、見た目を確認する（1回${MAX_FRAMES_PER_RENDER}枚まで）。
    文字の重なり・はみ出し・真っ暗や真っ白・何も映っていない・物が近すぎる/遠すぎる・方針と違う色、などを直す。
-5. 納得できたら finish を呼ぶ。render_frames での確認は3回までを目安にする。
+5. 納得できたら、必ず finish を呼んで終える。テキストの返事だけで終えると、未完成として扱われる。render_frames での確認は3回までを目安にする。
 
 # 部品集の説明書
 ${kitGuide}`;
@@ -129,16 +155,7 @@ export function createVideoTools(ctx: {
       name: "check",
       description: "型チェックと動画の組み立てを行い、エラーを返す。エラーがなければ OK。",
       inputSchema: z.object({}),
-      run: async () => {
-        const errors = await typecheck(ctx.jobId);
-        if (errors.length > 0) return `型エラー:\n${errors.slice(0, 40).join("\n")}`;
-        try {
-          await ctx.renderer.ensureBundle();
-        } catch (e) {
-          return `組み立てエラー:\n${String((e as Error).message).slice(0, 4000)}`;
-        }
-        return "OK（型エラー・組み立てエラーなし）";
-      },
+      run: async () => (await verifyJobCode(ctx.jobId, ctx.renderer)) ?? "OK（型エラー・組み立てエラーなし）",
     }),
     betaZodTool({
       name: "render_frames",
@@ -205,7 +222,7 @@ export async function runVideoAgent(opts: {
     model: env.CLAUDE_MODEL,
     max_tokens: 64000,
     stream: true,
-    max_iterations: 30,
+    max_iterations: MAX_ITERATIONS,
     betas: [FALLBACK_BETA],
     fallbacks: "default",
     thinking: { type: "adaptive" },
@@ -218,6 +235,9 @@ export async function runVideoAgent(opts: {
 
   let costUsd: number | null = 0;
   let turn = 0;
+  let nudges = 0;
+  let stop: VideoAgentResult["stop"] = "no_finish";
+  let lastText = "";
   for await (const stream of runner) {
     const message = await stream.finalMessage();
     turn++;
@@ -229,7 +249,28 @@ export async function runVideoAgent(opts: {
       .join(", ");
     console.log(`[video-agent:${job.id}] ${turn}回目 ${used || message.stop_reason}${cost !== null ? ` 約$${cost.toFixed(3)}` : ""}`);
     assertUsableStop(message, `映像:${job.id}`);
-    if (finished) break;
+    // finish を呼んだら、その場で道具を動かして確かめる（受け付けられたら、もう1回やりとりせずに終える）
+    if (message.content.some((b) => b.type === "tool_use" && b.name === "finish")) await runner.generateToolResponse();
+    if (finished) {
+      stop = "finished";
+      break;
+    }
+    const text = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n");
+    if (text) lastText = text;
+    if (message.stop_reason === "end_turn") {
+      // finish を呼ばずに返事を終えた：促して続けさせる（自分で履歴に足すと、今の返事は自動では足されない）
+      if (nudges >= MAX_NUDGES) {
+        stop = "no_finish";
+        break;
+      }
+      nudges++;
+      console.log(`[video-agent:${job.id}] finish が呼ばれていないので、呼ぶよう促します（${nudges}回目）`);
+      runner.pushMessages(
+        { role: "assistant", content: message.content as Anthropic.Beta.BetaContentBlockParam[] },
+        { role: "user", content: NUDGE },
+      );
+    }
   }
-  return { finished, summary, costUsd };
+  if (!finished && turn >= MAX_ITERATIONS) stop = "limit";
+  return { finished, stop, summary: summary || lastText, costUsd };
 }
