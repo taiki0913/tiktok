@@ -46,7 +46,7 @@ await writeJobFiles(jobDir, {
   scenes: example.scenes.map((s, i) => ({ ...s, ...timeline.scenes[i]!, audio: narration.clips[i]!.file })),
   endCard: { ...example.endCard, from: timeline.endCardFrom },
   bgm: bgmSrc ? "bgm.mp3" : null,
-  credits: narration.credit ? [narration.credit] : [],
+  credits: [],
 });
 await cp(join(EXAMPLE, "Video.tsx"), join(jobDir, "Video.tsx"));
 

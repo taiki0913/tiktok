@@ -66,7 +66,7 @@ if (p?.status === "review") {
   for (const f of p.factsToCheck ?? []) console.log(`⚠ 確認してほしい事実：${f.claim}（根拠：${f.basis}）`);
   for (const w of p.warnings) console.log(`⚠ ${w}`);
   if (p.costUsd != null) console.log(`映像づくりの費用の目安：約$${p.costUsd.toFixed(2)}`);
-  console.log(`\n📝 投稿文（説明文とハッシュタグ）：\n${postTextFor(proposal, p.script)}`);
+  console.log(`\n📝 投稿文（説明文とハッシュタグ）：\n${postTextFor(account, proposal, p)}`);
 } else {
   console.error(`\n⚠ 完成しませんでした：${p?.error ?? p?.status}`);
   process.exitCode = 1;

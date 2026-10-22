@@ -31,11 +31,17 @@ test("投稿文：説明文のあとに、#を付けてそろえたハッシュ�
   assert.equal(formatPostText(" 深海8000mの先に魚はいない ", ["深海", "#雑学", "宇宙 の ふしぎ", "深海"]), "深海8000mの先に魚はいない\n\n#深海 #雑学 #宇宙のふしぎ");
 });
 
-test("投稿文：完成した台本の投稿文を使い、なければ企画の投稿文を使う", () => {
+test("投稿文：完成した台本の投稿文を使い、なければ企画の投稿文を使う。最後にナレーションのクレジットを入れる", () => {
+  const base: ProductionState = { status: "approved", version: 1, warnings: [], revisions: [] };
   const script = { postCaption: "台本の投稿文", hashtags: ["江戸", "雑学"] } as VideoScript;
-  assert.equal(postTextFor(proposal, script), "台本の投稿文\n\n#江戸 #雑学");
-  assert.equal(postTextFor(proposal, {} as VideoScript), "企画の投稿文\n\n#日本史");
-  assert.equal(postTextFor(proposal), "企画の投稿文\n\n#日本史");
+  assert.equal(
+    postTextFor(history, proposal, { ...base, script, voiceCredit: "VOICEVOX:青山龍星" }),
+    "台本の投稿文\n\n#江戸 #雑学\n\nVOICEVOX:青山龍星",
+  );
+  // ナレーションなし（VOICEVOX が起動していなかった）ならクレジットは入れない
+  assert.equal(postTextFor(history, proposal, { ...base, script: {} as VideoScript, voiceCredit: null }), "企画の投稿文\n\n#日本史");
+  // 記録のない古い動画は、アカウントの声のクレジットを入れる
+  assert.equal(postTextFor(history, proposal), "企画の投稿文\n\n#日本史\n\nVOICEVOX:青山龍星");
 });
 
 test("ファイル名は投稿時刻が先頭で、Windowsで使えない文字を置き換える", () => {
@@ -60,6 +66,7 @@ async function setup() {
       warnings: [],
       revisions: [],
       script: { postCaption: "台本の投稿文", hashtags: ["江戸"] } as VideoScript,
+      voiceCredit: "VOICEVOX:青山龍星",
     };
   });
   const seen: (string | undefined)[] = [];
@@ -77,7 +84,7 @@ test("公開OKの動画と投稿文を、日付のフォルダに保存する", 
     assert.equal(s?.status, "saved");
     assert.equal(s?.videoFile, join(exportDir, DATE, "1900_知られざる日本史.mp4"));
     assert.equal(await readFile(s!.videoFile!, "utf8"), "video");
-    assert.equal(await readFile(join(exportDir, DATE, "1900_知られざる日本史.txt"), "utf8"), "台本の投稿文\n\n#江戸\n");
+    assert.equal(await readFile(join(exportDir, DATE, "1900_知られざる日本史.txt"), "utf8"), "台本の投稿文\n\n#江戸\n\nVOICEVOX:青山龍星\n");
     assert.deepEqual(t.seen, ["saved"]);
   } finally {
     await rm(t.dir, { recursive: true, force: true });

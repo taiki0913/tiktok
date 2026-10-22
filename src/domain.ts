@@ -77,6 +77,8 @@ export interface ProductionState {
   durationSec?: number;
   /** 台本エージェントが「自信なし」とした事実 */
   factsToCheck?: { claim: string; basis: string }[];
+  /** ナレーションのクレジット（例：VOICEVOX:九州そら）。投稿文に入れる。null はナレーションなし */
+  voiceCredit?: string | null;
   /** ナレーションを無音で代用したときなどの注意 */
   warnings: string[];
   agentSummary?: string;

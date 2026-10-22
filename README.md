@@ -67,7 +67,7 @@ copy .env.example .env
 
 ### 6. VOICEVOX と BGM（動画づくり用）
 - **VOICEVOX**：アプリを起動しておくだけで使えます（起動していないと、ナレーションなしの動画になります）。
-  声はアカウントごとに `config/accounts.yaml` の `voice` で決めています。キャラクターごとに利用規約があるので、[公式サイト](https://voicevox.hiroshiba.jp/)で確認してください。動画には「VOICEVOX:キャラ名」のクレジットが自動で入ります。
+  声はアカウントごとに `config/accounts.yaml` の `voice` で決めています。キャラクターごとに利用規約があるので、[公式サイト](https://voicevox.hiroshiba.jp/)で確認してください。クレジット（「VOICEVOX:キャラ名」）は動画の中には入れず、投稿文の最後に自動で入ります。
 - **BGM**：アカウントごとに、プログラムで作曲したオリジナル曲が2曲ずつ入っています（`public\bgm\`）。利用規約やクレジット表記を気にせず使えます。曲を足したいときは `public\bgm\README.md` を見てください。
 
 ### 7. お試し実行（Slackには送りません）
@@ -78,7 +78,7 @@ npm run produce:dry -- --account cosmos    # お試しで作った案Aから動�
 ```
 - `video:sample` は、VOICEVOX・BGM・動画の書き出しがPCで動くかの確認用です。`out\sample-future.mp4` ができれば成功です。初回は、書き出し用のChromeが自動でダウンロードされます（数分かかります）。
 - `produce:dry` の動画は `data\videos\` にできます。`--index 1` で案Bから作れます。
-- `npm run export -- --account cosmos` で、そのアカウントのいちばん新しい動画の投稿文（説明文＋ハッシュタグ）を表示し、動画と投稿文を保存先（`EXPORT_DIR`）に保存します。お試しで作った動画を投稿したいときに使います。
+- `npm run export -- --account cosmos` で、そのアカウントのいちばん新しい動画の投稿文（説明文＋ハッシュタグ）を表示し、動画と投稿文を保存先（`EXPORT_DIR`）に保存します。お試しで作った動画を投稿したいときに使います。`--rerender` を付けると、今の設定で書き出し直してから保存します（以前の動画からクレジット表記を消すときなど。Claude API は使いません）。
 
 ### 8. TikTokアカウントを作る
 6アカウント分のプロフィール（名前・ID・自己紹介・写真）の案と、収益化のための注意点を [docs/tiktok-accounts.md](docs/tiktok-accounts.md) にまとめています。写真は画像生成AIで作ります（プロンプトは [docs/icon-prompts.md](docs/icon-prompts.md)）。

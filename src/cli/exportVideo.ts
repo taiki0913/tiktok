@@ -2,16 +2,24 @@
 // Slack を通さずに作った動画（npm run produce:dry）や、公開OKの前の動画にも使える。
 //   npm run export -- --account cosmos                    … そのアカウントのいちばん新しい動画
 //   npm run export -- --account cosmos --date 2026-10-22  … 日付を指定
-import { readdir, readFile } from "node:fs/promises";
+//   npm run export -- --account cosmos --rerender         … 今の設定で書き出し直してから保存する
+//                                                            （クレジット表記を消すなど。Claude は使わない）
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { loadAccounts } from "../config/accounts.js";
 import { env } from "../config/env.js";
 import type { DayState } from "../domain.js";
 import { writeExport } from "../production/exporter.js";
+import { JOBS_DIR } from "../production/pipeline.js";
 import { postTextFor } from "../production/postText.js";
+import { JobRenderer } from "../production/renderer.js";
+import { productionSettings } from "../production/settings.js";
+import type { JobData } from "../../video/kit/job.js";
 
-const { values } = parseArgs({ options: { account: { type: "string" }, date: { type: "string" } } });
+const { values } = parseArgs({
+  options: { account: { type: "string" }, date: { type: "string" }, rerender: { type: "boolean", default: false } },
+});
 const accounts = await loadAccounts(env.ACCOUNTS_FILE);
 const account = accounts.find((a) => a.id === values.account);
 if (!account) {
@@ -45,7 +53,28 @@ if (!latest) {
 }
 
 const p = latest.state.production!;
-const text = postTextFor(latest.proposal, p.script);
+
+if (values.rerender) {
+  // 作業フォルダに残っている映像のコードを、今の設定（ナレーションのクレジットを動画に入れない）で書き出し直す
+  if (!p.jobId) throw new Error("この動画の作業フォルダが分かりません");
+  const jobDir = join(JOBS_DIR, p.jobId);
+  const jobFile = join(jobDir, "job.json");
+  const job = JSON.parse(await readFile(jobFile, "utf8").catch(() => {
+    throw new Error(`作業フォルダが見つかりません：${jobDir}`);
+  })) as JobData;
+  job.credits = [];
+  await writeFile(jobFile, JSON.stringify(job, null, 2), "utf8");
+  console.log(`書き出し直しています…（${p.videoFile}）`);
+  const renderer = new JobRenderer(jobDir, p.jobId, productionSettings().render);
+  let last = -1;
+  await renderer.video(p.videoFile!, (r) => {
+    const pct = Math.floor(r * 10) * 10;
+    if (pct > last) console.log(`  ${(last = pct)}%`);
+  });
+  await renderer.cleanup();
+}
+
+const text = postTextFor(account, latest.proposal, p);
 console.log(`${account.name}（${latest.label}・${latest.date}）「${latest.proposal.title}」`);
 console.log(`動画：${p.videoFile}`);
 console.log(`\n----- 投稿文（ここから） -----\n${text}\n----- 投稿文（ここまで） -----\n`);

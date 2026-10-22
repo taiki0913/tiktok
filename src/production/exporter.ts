@@ -45,7 +45,7 @@ export async function saveApprovedVideo(deps: SaveDeps, account: Account, date: 
   const proposal = s?.proposals?.[s.selectedIndex ?? -1];
   if (!p || p.status !== "approved" || !p.videoFile || !proposal) return;
 
-  const text = postTextFor(proposal, p.script);
+  const text = postTextFor(account, proposal, p);
   let saved: SavedState;
   try {
     const files = await writeExport({ exportDir: deps.exportDir, date, account, videoFile: p.videoFile, text });

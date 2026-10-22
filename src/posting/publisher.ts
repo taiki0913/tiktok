@@ -95,7 +95,7 @@ export class Publisher {
       plan.request = {
         profile: account.id,
         videoFile: p.videoFile,
-        caption: postTextFor(proposal, p.script),
+        caption: postTextFor(account, proposal, p),
         ...(at ? { scheduledAt: at } : {}),
         aigc: account.production === "ai_video",
         idempotencyKey: `${p.jobId}-post${attempt}`,

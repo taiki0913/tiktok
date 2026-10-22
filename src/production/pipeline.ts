@@ -161,7 +161,8 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       })),
       endCard: { from: timeline.endCardFrom, question: script.endQuestion, sources: script.sources },
       bgm,
-      credits: narration.credit ? [narration.credit] : [],
+      // ナレーションのクレジットは動画には入れず、投稿文に入れる
+      credits: [],
       accent: account.accent,
       visual: account.visual,
     };
@@ -178,6 +179,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     await setState((p) => {
       p.status = "coding";
       p.warnings = warnings;
+      p.voiceCredit = narration.credit;
     });
     const agent = await runVideoAgent({ account, job, jobDir, renderer, revision: revision?.instruction });
     if (!agent.finished) throw new Error("映像が完成しませんでした（エージェントとのやりとりが上限に達しました）");
