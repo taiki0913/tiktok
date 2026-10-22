@@ -17,7 +17,9 @@
     "video:studio": "remotion studio video/index.ts",
     "produce:dry": "tsx src/cli/produce.ts",
     "video:sample": "tsx src/cli/renderSample.ts",
-    "icons": "tsx src/cli/renderIcons.ts"
+    "icons": "tsx src/cli/renderIcons.ts",
+    "posting:setup": "tsx src/cli/postingSetup.ts",
+    "posting:test": "tsx src/cli/postingTest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -34,6 +36,7 @@
     "react-dom": "^19.3.1",
     "remotion": "^4.0.536",
     "three": "^0.186.1",
+    "upload-post": "^2.15.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },

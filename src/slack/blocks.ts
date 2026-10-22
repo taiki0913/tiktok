@@ -2,8 +2,10 @@
 import type { types as Slack } from "@slack/bolt";
 import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
-import type { AccountDayState, DayState, ProductionState, Proposal } from "../domain.js";
-import { formatJpDate } from "../util/date.js";
+import { env } from "../config/env.js";
+import type { AccountDayState, DayState, PostState, ProductionState, Proposal } from "../domain.js";
+import { isPostLocked } from "../posting/publisher.js";
+import { formatJpDate, formatJpDateTime } from "../util/date.js";
 
 export const ACTIONS = {
   approve: "approve_proposal",
@@ -15,6 +17,8 @@ export const ACTIONS = {
   videoApprove: "video_approve",
   videoReviseOpen: "video_revise_open",
   videoRetry: "video_retry",
+  postCancel: "post_cancel",
+  postRetry: "post_retry",
 } as const;
 export const REVISE_CALLBACK = "revise_submit";
 export const VIDEO_REVISE_CALLBACK = "video_revise_submit";
@@ -98,7 +102,7 @@ export function productionLine(p?: ProductionState): string {
     case "review":
       return "🎬 動画ができました。このメッセージのスレッドで確認してください";
     case "approved":
-      return "✅ 動画：公開OK（投稿待ち）";
+      return postLine(p.post);
     case "failed":
       return "⚠️ 動画の作成に失敗しました。スレッドを確認してください";
     case "unsupported":
@@ -106,9 +110,46 @@ export function productionLine(p?: ProductionState): string {
   }
 }
 
+const postTime = (post: PostState): string => (post.scheduledAt ? formatJpDateTime(post.scheduledAt, env.TIMEZONE) : "");
+
+/** 公開OKのあとの、投稿の進み具合 */
+function postLine(post?: PostState): string {
+  switch (post?.status) {
+    case undefined:
+    case "scheduling":
+      return "✅ 動画：公開OK（投稿の準備中…）";
+    case "manual":
+      return "✅ 動画：公開OK（投稿サービスが未設定のため、手で投稿してください）";
+    case "scheduled":
+      return `📅 ${postTime(post)} にTikTokへ投稿予約済み`;
+    case "posting":
+      return "📤 TikTokに投稿中…";
+    case "posted":
+      return post.url ? `🎉 TikTokに投稿しました（<${post.url}|動画を見る>）` : "🎉 TikTokに投稿しました";
+    case "failed":
+      return "⚠️ TikTokへの投稿に失敗しました。スレッドを確認してください";
+    case "canceled":
+      return "⏹ 投稿予約を取り消しました";
+    case "unknown":
+      return "❔ 投稿の結果を確認できませんでした。TikTokアプリで確認してください";
+  }
+}
+
+const POST_SHORT: Record<PostState["status"], string> = {
+  scheduling: "🎬公開OK",
+  manual: "🎬公開OK（手で投稿）",
+  scheduled: "📅投稿予約済み",
+  posting: "📤投稿中",
+  posted: "🎉投稿済み",
+  failed: "⚠️投稿失敗",
+  canceled: "⏹予約取り消し",
+  unknown: "❔投稿結果不明",
+};
+
 /** 一覧メッセージ用の短い表示 */
 function productionShort(p?: ProductionState): string {
   if (!p) return "";
+  if (p.status === "approved" && p.post) return `　${POST_SHORT[p.post.status]}`;
   const label: Record<ProductionState["status"], string> = {
     queued: "🎬順番待ち",
     scripting: "🎬制作中",
@@ -126,7 +167,7 @@ function productionShort(p?: ProductionState): string {
 /** スレッドに出す、完成した動画の確認メッセージ */
 export function reviewBlocks(date: string, accountId: string, p: ProductionState): Slack.KnownBlock[] {
   const v = { d: date, a: accountId };
-  if (p.status === "approved") return [mrkdwn("✅ *公開OKにしました*（投稿の自動化は次のフェーズで追加します）")];
+  if (p.status === "approved") return approvedBlocks(v, p);
   const blocks: Slack.KnownBlock[] = [
     mrkdwn(`🎬 *動画ができました*（約${p.durationSec ?? "?"}秒・${p.version}回目）\n${p.agentSummary ?? ""}`),
   ];
@@ -146,6 +187,43 @@ export function reviewBlocks(date: string, accountId: string, p: ProductionState
     elements: [button("✅ 公開OK", ACTIONS.videoApprove, v, "primary"), button("✏️ 作り直す", ACTIONS.videoReviseOpen, v)],
   });
   return blocks;
+}
+
+/** 公開OKにしたあとの確認メッセージ：投稿の予約・結果と、取り消し・やり直しのボタン */
+function approvedBlocks(v: { d: string; a: string }, p: ProductionState): Slack.KnownBlock[] {
+  const post = p.post;
+  switch (post?.status) {
+    case undefined:
+    case "scheduling":
+      return [mrkdwn("✅ *公開OKにしました*\n📤 投稿サービスにアップロードしています…")];
+    case "manual":
+      return [
+        mrkdwn(`✅ *公開OKにしました*\n投稿サービス（Upload-Post）が未設定なので、TikTokへは手で投稿してください。\n動画：\`${p.videoFile ?? ""}\``),
+        { type: "actions", elements: [button("📤 投稿サービスで投稿する", ACTIONS.postRetry, v)] },
+      ];
+    case "scheduled":
+      return [
+        mrkdwn(`✅ *公開OKにしました*\n📅 *${postTime(post)} にTikTokへ投稿予約しました*（その時刻にPCが止まっていても投稿されます）`),
+        ...(post.error ? [context(`⚠️ ${post.error}`)] : []),
+        { type: "actions", elements: [button("⏹ 予約を取り消す", ACTIONS.postCancel, v, "danger")] },
+      ];
+    case "posting":
+      return [mrkdwn("✅ *公開OKにしました*\n📤 投稿時刻を過ぎていたので、すぐにTikTokへ投稿しています…")];
+    case "posted":
+      return [mrkdwn(`🎉 *TikTokに投稿しました*${post.url ? `\n<${post.url}|投稿した動画を見る>` : ""}`)];
+    case "failed":
+      return [
+        mrkdwn(`⚠️ *TikTokへの投稿に失敗しました*\n\`\`\`${truncate(post.error ?? "不明なエラー", 1500)}\`\`\``),
+        { type: "actions", elements: [button("🔄 もう一度投稿する", ACTIONS.postRetry, v, "primary")] },
+      ];
+    case "canceled":
+      return [
+        mrkdwn("⏹ *投稿予約を取り消しました*"),
+        { type: "actions", elements: [button("📅 もう一度予約する", ACTIONS.postRetry, v)] },
+      ];
+    case "unknown":
+      return [mrkdwn("❔ *投稿の結果を確認できませんでした*\n二重に投稿しないよう、自動ではやり直しません。TikTokアプリで投稿されているか確認してください。")];
+  }
 }
 
 export function failureBlocks(date: string, accountId: string, p: ProductionState): Slack.KnownBlock[] {
@@ -235,8 +313,8 @@ export function accountBlocks(
         mrkdwn(p ? `✅ *案${proposalLetter(i)}「${p.title}」に決定*\n${p.summary}` : "✅ 決定済み"),
         context(productionLine(state.production)),
       );
-      // 動画づくりの途中は取り消せない（作りかけのものと食い違わないように）
-      if (!isProductionBusy(state.production)) {
+      // 動画づくりの途中や、投稿の予約・投稿のあとは取り消せない（作りかけ・予約済みのものと食い違わないように）
+      if (!isProductionBusy(state.production) && !isPostLocked(state.production?.post)) {
         blocks.push({ type: "actions", elements: [button("↩️ 決定を取り消す", ACTIONS.undo, v)] });
       }
       break;

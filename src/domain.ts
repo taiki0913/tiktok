@@ -86,6 +86,33 @@ export interface ProductionState {
   revisions: { instruction: string; mode: "script" | "visual"; at: string }[];
   /** スレッドに投稿した確認メッセージ */
   slackReviewTs?: string;
+  /** TikTok への投稿（公開OKのあと） */
+  post?: PostState;
+}
+
+export type PostStatus =
+  | "scheduling" // 投稿サービスへアップロード中
+  | "scheduled" // 投稿予約済み（時刻になると投稿サービスが投稿する）
+  | "posting" // すぐ投稿にした。結果待ち
+  | "posted"
+  | "failed"
+  | "canceled"
+  | "unknown" // 結果を確認できなかった
+  | "manual"; // 投稿サービスが未設定。手で投稿する
+
+export interface PostState {
+  status: PostStatus;
+  /** 何回目の投稿の試みか（やり直すたびに増える。二重投稿を防ぐキーにも使う） */
+  attempt: number;
+  /** 投稿する時刻（ISO） */
+  scheduledAt?: string;
+  /** 投稿サービスの受付番号（予約投稿は jobId、すぐ投稿は requestId） */
+  jobId?: string;
+  requestId?: string;
+  url?: string;
+  error?: string;
+  /** 投稿の結果をスレッドで知らせたか */
+  notified?: boolean;
 }
 
 export interface AccountDayState {

@@ -5,7 +5,7 @@
 いま動くのは次のところまでです（[設計メモ](docs/design.md)）。
 - **フェーズ1**：競合調査・企画・Slackでの承認
 - **フェーズ2**：動画作成（ポリゴン調3D・モーショングラフィックスの4アカウント）。漫画・AI映像のアカウントは準備中です。
-- 投稿（フェーズ3）はこれからです。
+- **フェーズ3**：TikTokへの予約投稿（投稿サービス Upload-Post を使う）。再生数を企画に生かすしくみはこれからです。
 
 ## 毎日の流れ
 
@@ -21,7 +21,7 @@
    3. 動画作成エージェントが映像のコードを書き、静止画で見た目を確かめながら直す
    4. 動画に書き出す
 5. 完成すると、企画のメッセージのスレッドに動画が届きます。
-   - **✅ 公開OK**：投稿待ちになります（投稿の自動化はフェーズ3）
+   - **✅ 公開OK**：そのアカウントの投稿時刻（`config/accounts.yaml` の `postTime`）に、TikTokへ投稿予約されます。投稿時刻を過ぎていたら、すぐに投稿します。予約は「⏹ 予約を取り消す」で取り消せます
    - **✏️ 作り直す**：「映像だけ直す」か「台本から作り直す」を選び、直してほしいことを書きます
    - 台本エージェントが「自信なし」とした事実は、**⚠️ 確認してほしい事実**として一緒に届きます
 
@@ -79,7 +79,27 @@ npm run produce:dry -- --account cosmos    # お試しで作った案Aから動�
 - `video:sample` は、VOICEVOX・BGM・動画の書き出しがPCで動くかの確認用です。`out\sample-future.mp4` ができれば成功です。初回は、書き出し用のChromeが自動でダウンロードされます（数分かかります）。
 - `produce:dry` の動画は `data\videos\` にできます。`--index 1` で案Bから作れます。
 
-### 8. 本番起動
+### 8. TikTokアカウントを作る
+6アカウント分のプロフィール（名前・ID・自己紹介・写真）の案と、収益化のための注意点を [docs/tiktok-accounts.md](docs/tiktok-accounts.md) にまとめています。写真は画像生成AIで作ります（プロンプトは [docs/icon-prompts.md](docs/icon-prompts.md)）。
+
+### 9. TikTokへの投稿（Upload-Post）
+TikTok への投稿は、TikTok の審査を通った投稿サービス **Upload-Post** を通して行います（自作のアプリでは、TikTok の審査を通るまで「自分だけに公開」の投稿しかできないため）。
+
+1. https://www.upload-post.com/ に登録し、TikTok に投稿できる有料プランを選びます（無料プランでは TikTok に投稿できません）。料金とプロフィール数（つなげる TikTok アカウントの数）は料金ページで確認してください。
+2. Upload-Post の画面で API キーを発行し、`.env` の `UPLOAD_POST_API_KEY` に貼ります。
+3. 次を実行します。アカウントごとに Upload-Post のプロフィールを作り、TikTok をつなぐためのURLを表示します。
+   ```powershell
+   npm run posting:setup
+   ```
+4. 表示されたURLをアカウントごとに開き、TikTok を選んで、**そのアカウントの TikTok** でログインします。
+   - 別のアカウントと取り違えないよう、URLは1つずつ**シークレットウィンドウ**（Ctrl+Shift+N）で開いてください。
+   - ログインは「QRコード」を選び、スマホの TikTok アプリ（そのアカウントに切り替えておく）で読み取るのが簡単です。
+5. もう一度 `npm run posting:setup` を実行し、すべて ✅ になれば完了です。
+6. （試したいとき）`npm run posting:test -- --account cosmos` で、`data\videos\` のいちばん新しい動画を「自分だけに公開」で投稿します。確認したら TikTok アプリから削除してください。
+
+`UPLOAD_POST_API_KEY` が空のときは、公開OKのあと Slack に動画の場所が表示されるので、手で投稿してください。
+
+### 10. 本番起動
 ```powershell
 npm start
 ```
@@ -87,7 +107,7 @@ npm start
 - 予定時刻（6:30）より後にPCを起動した日は、起動時に今日の分を作ります（15時まで）。
 - 作りかけの動画があった場合は、起動時に続きから作ります。
 
-### 9. PC起動時に自動で立ち上げる
+### 11. PC起動時に自動で立ち上げる
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 ```
@@ -96,9 +116,6 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 > **スリープに注意**：PCがスリープすると止まります。「設定 → システム → 電源」で、電源接続時はスリープしない設定にしてください。
 > また、Windows Update などで再起動したあとは、Windowsにログオンするまで起動しません。
 
-### 10. TikTokアカウントを作る
-6アカウント分のプロフィール（名前・ID・自己紹介・写真）の案と、収益化のための注意点を [docs/tiktok-accounts.md](docs/tiktok-accounts.md) にまとめています。写真は `assets\profile-icons\` にあります。
-
 ## 設定を変える
 
 | 変えたいもの | 場所 |
@@ -106,11 +123,13 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\register-task.ps1
 | アカウントのジャンル・トーン・ルール・競合調査の検索語 | `config/accounts.yaml` |
 | 動画の見た目の方針・強調色・ナレーションの声 | `config/accounts.yaml` の `visual`・`accent`・`voice` |
 | 企画が届く時刻 | `.env` の `MORNING_CRON`（例：`0 6 * * *` で6:00開始） |
+| TikTokへの投稿時刻 | `config/accounts.yaml` の `postTime` |
 | Web検索で今週の話題も調べる（費用が約3倍になります） | `.env` の `RESEARCH_WEB_SEARCH=true` |
 
 ## 費用の目安
 - 企画づくり（Claude API）：6アカウント×毎日で、月 $30〜50 程度
 - 動画づくり（Claude API）：1本あたり約$1。4アカウント×毎日で月 $120 前後（作り直しの回数で変わります）
+- 投稿（Upload-Post）：TikTok に投稿できる有料プランが必要です。比較記事では、5プロフィールまでのプランが月 $24 前後とされています（2026年7月時点。最新の料金は公式の料金ページで確認してください）
 - YouTube Data API・VOICEVOX：無料
 
 > **Remotion のライセンス**：動画づくりに使っている Remotion は、個人と従業員3人以下の会社は無料、それより大きい会社は有料のライセンスが必要です。詳しくは https://www.remotion.dev/license を確認してください。
@@ -129,7 +148,8 @@ npm run icons          # プロフィール写真を assets/profile-icons/ に�
 | `src/research/` | 競合調査エージェント（YouTube公式API・TikTok公式oEmbed。Web検索は既定で無効） |
 | `src/planning/` | 企画エージェント |
 | `src/production/` | 動画づくり（台本エージェント・VOICEVOX・動画作成エージェント・書き出し・順番待ち） |
-| `src/slack/` | Slackボット（企画の承認・修正指示・参考動画の登録・動画の確認） |
+| `src/slack/` | Slackボット（企画の承認・修正指示・参考動画の登録・動画の確認・投稿予約の取り消し） |
+| `src/posting/` | TikTokへの投稿（Upload-Post での予約投稿・結果の確認） |
 | `src/jobs/` | 毎朝の一括実行 |
 | `src/store/` | 企画と承認状況の保存（`data/` フォルダにJSONで保存） |
 | `config/accounts.yaml` | 6アカウントの設定 |

@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { loadAccounts } from "./config/accounts.js";
 import { env, requireClaudeEnv, requireSlackEnv } from "./config/env.js";
 import { runMorningPlanning } from "./jobs/planning.js";
+import { postingSettings } from "./posting/settings.js";
 import { productionSettings } from "./production/settings.js";
 import { createSlackBot } from "./slack/app.js";
 import { Store } from "./store/store.js";
@@ -41,6 +42,7 @@ const bot = createSlackBot({
   store,
   onRunRequested: () => runToday("Slackで「企画作成」"),
   production: productionSettings(),
+  posting: postingSettings(),
 });
 await bot.app.start();
 console.log(`[slack] 接続しました（アカウント数: ${accounts.length}）`);
@@ -48,6 +50,10 @@ console.log(`[slack] 接続しました（アカウント数: ${accounts.length}
 // 前回の終了時に作りかけだった動画があれば、続きから作る
 const resumed = await bot.production.resume(today());
 if (resumed > 0) console.log(`[produce] 作りかけの動画 ${resumed} 本の制作を再開します`);
+
+// 投稿の結果を定期的に確かめる（公開OKの直後に止まった投稿の続きもここで行う）
+bot.publisher.start();
+console.log(env.UPLOAD_POST_API_KEY ? "[post] 公開OKの動画は Upload-Post で投稿予約します" : "[post] UPLOAD_POST_API_KEY が未設定のため、公開OKの動画は手で投稿してください");
 
 const task = cron.schedule(env.MORNING_CRON, () => runToday("定時実行"), {
   timezone: env.TIMEZONE,

@@ -8,6 +8,7 @@ import { loadAccounts } from "../config/accounts.js";
 import { env, requireClaudeEnv, requireSlackEnv } from "../config/env.js";
 import { ConsoleNotifier } from "../jobs/consoleNotifier.js";
 import { runMorningPlanning, type PlanningDeps } from "../jobs/planning.js";
+import { postingSettings } from "../posting/settings.js";
 import { productionSettings } from "../production/settings.js";
 import { createSlackBot } from "../slack/app.js";
 import { Store } from "../store/store.js";
@@ -44,6 +45,7 @@ if (values["dry-run"]) {
     store,
     onRunRequested: async () => {},
     production: productionSettings(),
+    posting: postingSettings(),
   }).deps;
 }
 

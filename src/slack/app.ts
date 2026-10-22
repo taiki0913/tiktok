@@ -15,6 +15,7 @@ import {
   type ProductionNotifier,
   type Revision,
 } from "../production/pipeline.js";
+import { isPostLocked, Publisher, type PostingDeps } from "../posting/publisher.js";
 import { extractTikTokUrls, fetchTikTokEmbed } from "../research/tiktokOembed.js";
 import type { Store } from "../store/store.js";
 import { formatJpDate } from "../util/date.js";
@@ -107,6 +108,19 @@ class SlackNotifier implements PlanNotifier, ProductionNotifier {
         text: "公開OKにしました",
         blocks: reviewBlocks(date, account.id, p),
       });
+      // 投稿の結果は、メッセージの更新だけだと気づけないのでスレッドでも知らせる
+      const post = p.post;
+      if (post && !post.notified && (post.status === "posted" || post.status === "failed" || post.status === "unknown")) {
+        const text = {
+          posted: `🎉 ${account.name} の動画をTikTokに投稿しました${post.url ? `\n${post.url}` : ""}`,
+          failed: `⚠️ ${account.name} の動画をTikTokに投稿できませんでした。上のメッセージの「もう一度投稿する」でやり直せます`,
+          unknown: `❔ ${account.name} の動画が投稿されたか確認できませんでした。TikTokアプリで確認してください`,
+        }[post.status];
+        await this.app.client.chat.postMessage({ ...thread, text });
+        await this.store.updateAccount(date, account.id, (s) => {
+          if (s.production?.post) s.production.post.notified = true;
+        });
+      }
       return;
     }
     if (p.slackReviewTs) return; // この回の確認メッセージは投稿済み
@@ -165,6 +179,7 @@ export interface SlackBot {
   app: BoltApp;
   deps: PlanningDeps;
   production: ProductionQueue;
+  publisher: Publisher;
 }
 
 export function createSlackBot(opts: {
@@ -175,12 +190,15 @@ export function createSlackBot(opts: {
   onRunRequested: () => Promise<void>;
   /** 動画づくりの設定 */
   production: Omit<ProductionDeps, "store" | "notifier">;
+  /** 投稿の設定（service が null なら手で投稿する） */
+  posting: Omit<PostingDeps, "store" | "notifier">;
 }): SlackBot {
   const { slack, accounts, store } = opts;
   const app = new App({ token: slack.botToken, appToken: slack.appToken, socketMode: true });
   const notifier = new SlackNotifier(app, slack.channelId, store, accounts);
   const deps: PlanningDeps = { store, notifier, accounts };
   const production = new ProductionQueue({ ...opts.production, store, notifier }, accounts);
+  const publisher = new Publisher({ ...opts.posting, store, notifier }, accounts);
 
   /** 動画づくりを順番待ちに入れる（作り直しのときは revision を渡す） */
   const startProduction = async (date: string, account: Account, revision?: Revision): Promise<void> => {
@@ -235,7 +253,8 @@ export function createSlackBot(opts: {
   });
 
   handleDecision(ACTIONS.undo, (s) => {
-    if (isProductionBusy(s.production)) return; // 動画づくりの途中は取り消さない
+    // 動画づくりの途中や、投稿の予約・投稿のあとは取り消さない
+    if (isProductionBusy(s.production) || isPostLocked(s.production?.post)) return;
     if ((s.status === "approved" || s.status === "skipped") && s.proposals) {
       s.status = "awaiting_approval";
       delete s.selectedIndex;
@@ -266,14 +285,31 @@ export function createSlackBot(opts: {
   });
 
   // ---- 完成した動画の確認 ----
+  // 公開OKにしたら、そのアカウントの投稿時刻に投稿予約する
   app.action<BlockAction<ButtonAction>>(ACTIONS.videoApprove, async ({ ack, action }) => {
     await ack();
     const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
     const account = findAccount(v.a);
+    let approvedNow = false;
     const state = await store.updateAccount(v.d, v.a, (s) => {
-      if (s.production?.status === "review") s.production.status = "approved";
+      if (s.production?.status !== "review") return;
+      s.production.status = "approved";
+      approvedNow = true;
     });
     await notifier.productionUpdated(v.d, account, state);
+    if (approvedNow) background("投稿", publisher.publish(account, v.d));
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.postCancel, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    background("投稿予約の取り消し", publisher.cancel(findAccount(v.a), v.d));
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.postRetry, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    background("投稿のやり直し", publisher.publish(findAccount(v.a), v.d, { retry: true }));
   });
 
   app.action<BlockAction<ButtonAction>>(ACTIONS.videoReviseOpen, async ({ ack, action, body, client }) => {
@@ -353,5 +389,5 @@ export function createSlackBot(opts: {
     console.error("[slack] エラー", e);
   });
 
-  return { app, deps, production };
+  return { app, deps, production, publisher };
 }
