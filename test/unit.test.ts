@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { loadAccounts } from "../src/config/accounts.js";
+import { CODE_PRODUCIBLE, isPlanningDay, loadAccounts } from "../src/config/accounts.js";
 import { PlanSchema, ResearchBriefSchema, type AccountDayState, type Proposal } from "../src/domain.js";
 import { extractTikTokUrls } from "../src/research/tiktokOembed.js";
 import { isJapaneseTitle, parseIsoDuration, toVideos } from "../src/research/youtube.js";
@@ -46,9 +46,20 @@ test("accounts.yaml: 6アカウントがすべて読み込める", () => {
   assert.equal(accounts.length, 6);
   assert.deepEqual(
     accounts.map((a) => a.production).sort(),
-    ["ai_video", "manga", "motion_graphics", "polygon", "polygon", "polygon"],
+    ["manga", "motion_graphics", "polygon", "polygon", "polygon", "polygon"],
   );
   for (const a of accounts) assert.ok(a.lengthSec[0] >= 60, `${a.id} は60秒以上`);
+});
+
+test("企画を作る日：2組が1日おきに交互に作り、休止中のアカウントは作らない", () => {
+  const on = (date: string) => accounts.filter((a) => isPlanningDay(a, date)).map((a) => a.id).sort();
+  assert.deepEqual(on("2026-10-22"), ["cosmos", "history"]);
+  assert.deepEqual(on("2026-10-23"), ["psychology", "urban_legend"]);
+  assert.deepEqual(on("2026-10-24"), ["cosmos", "history"]);
+  // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）
+  assert.notDeepEqual(on("2026-10-31"), on("2026-11-01"));
+  // 作る日のアカウントは、すべてコードで動画にできる作り方
+  for (const a of accounts.filter((x) => x.active)) assert.ok(CODE_PRODUCIBLE.includes(a.production), a.id);
 });
 
 test("日付ユーティリティ", () => {

@@ -52,9 +52,27 @@ const AccountSchema = z.object({
     speed: z.number().positive().default(1.15),
   }),
   postTime: z.string().regex(/^\d{2}:\d{2}$/),
+  /** false にすると、企画も動画も作らない（休止） */
+  active: z.boolean().default(true),
+  /** 企画を作る日。every 日に1回、group の組の日に作る（every: 2 なら group 0 と 1 が交互） */
+  schedule: z
+    .object({
+      every: z.number().int().positive().default(1),
+      group: z.number().int().nonnegative().default(0),
+    })
+    .default({ every: 1, group: 0 }),
 });
 
 export type Account = z.infer<typeof AccountSchema>;
+
+/** その日（YYYY-MM-DD）に、このアカウントの企画を作るか */
+export function isPlanningDay(account: Account, date: string): boolean {
+  if (!account.active) return false;
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const dayNumber = Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+  const { every, group } = account.schedule;
+  return dayNumber % every === group % every;
+}
 
 const AccountsFileSchema = z.object({
   accounts: z.array(AccountSchema).min(1),

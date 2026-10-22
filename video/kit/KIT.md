@@ -52,11 +52,14 @@
 | `House` | position, rotationY?, width?, depth?, height?, wallColor?, roofColor?, roof?, lights?, tilt? | 一戸建て。lights=窓明かり、tilt=傾き |
 | `Building` | position, width?, depth?, height?, color?, windowsLit? | ビル（窓つき） |
 | `EdoHouse` | position, rotationY?, width?, depth?, height?, wallColor?, roofColor?, lights? | 江戸の町家・長屋 |
-| `Person` | position, rotationY?, color?, height?, walk?, kimono? | 顔のない人。walk にフレームを渡すと歩く |
+| `Person` | position, rotationY?, color?, height?, walk?, kimono?, silhouette? | 顔のない人。walk にフレームを渡すと歩く。silhouette で全身を黒い影にする |
 | `Tree` | position, height?, color?, kind?: "round"/"pine" | 木 |
 | `Road` | from, to, width?, color? | 中央線つきの道路 |
 | `Car` | position, rotationY?, color? | 車 |
 | `Lantern` | position, color?, glow?, kind?: "chochin"/"andon" | 光る提灯・行灯 |
+| `StreetLamp` | position, height?, glow?, color?, flicker?, rotationY? | 街灯（足元を照らす光と光の筋つき）。flicker にフレームを渡すと、ときどき明滅 |
+| `UtilityPole` | position, height?, wireTo? | 電柱。wireTo に隣の電柱の位置を渡すと電線を張る |
+| `Torii` | position, rotationY?, color?, scale? | 鳥居 |
 | `Kofun` | position, rotationY?, size?, color? | 前方後円墳 |
 | `Mountain` | position, radius?, height?, color?, snow? | 山 |
 | `Rock` | position, size?, color?, seed? | 岩 |

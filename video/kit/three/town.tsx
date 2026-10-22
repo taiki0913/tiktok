@@ -1,4 +1,4 @@
-// 町の部品：家・ビル・江戸の町家・人・木・道路・車・提灯・古墳・山・岩。
+// 町の部品：家・ビル・江戸の町家・人・木・道路・車・提灯・街灯・電柱・鳥居・古墳・山・岩。
 // すべて単純な立体の組み合わせ（ポリゴン調）。position は地面に置く位置（足元）。
 import React, { useMemo } from "react";
 import { random } from "remotion";
@@ -21,6 +21,9 @@ const Std: React.FC<{ color: string; emissive?: string; emissiveIntensity?: numb
     opacity={opacity ?? 1}
   />
 );
+
+/** 人影：光を受けない真っ黒な材質（街灯の下でも黒いまま） */
+const Shadow: React.FC = () => <meshBasicMaterial color="#050608" />;
 
 /** 三角屋根（切妻）の形。幅・高さ・奥行きから作る */
 function useGableRoof(width: number, height: number, depth: number): THREE.ExtrudeGeometry {
@@ -168,7 +171,9 @@ export const Person: React.FC<{
   walk?: number;
   /** 着物風（すそが広がった形）にする */
   kimono?: boolean;
-}> = ({ position, rotationY = 0, color = "#e05a47", height = 1.7, walk, kimono = false }) => {
+  /** 全身を黒い影にする（怖い話の人影など） */
+  silhouette?: boolean;
+}> = ({ position, rotationY = 0, color = "#e05a47", height = 1.7, walk, kimono = false, silhouette = false }) => {
   const s = height / 1.7;
   const swing = walk === undefined ? 0 : Math.sin(walk * 0.3) * 0.5;
   return (
@@ -176,18 +181,18 @@ export const Person: React.FC<{
       {kimono ? (
         <mesh position={[0, 0.65, 0]}>
           <cylinderGeometry args={[0.2, 0.32, 1.1, 6]} />
-          <Std color={color} />
+          {silhouette ? <Shadow /> : <Std color={color} />}
         </mesh>
       ) : (
         <>
           <mesh position={[0, 0.95, 0]}>
             <boxGeometry args={[0.42, 0.6, 0.26]} />
-            <Std color={color} />
+            {silhouette ? <Shadow /> : <Std color={color} />}
           </mesh>
           {[-1, 1].map((side) => (
             <mesh key={side} position={[side * 0.11, 0.33, 0]} rotation={[side * swing, 0, 0]}>
               <boxGeometry args={[0.15, 0.66, 0.18]} />
-              <Std color="#3a3f4a" />
+              {silhouette ? <Shadow /> : <Std color="#3a3f4a" />}
             </mesh>
           ))}
         </>
@@ -195,12 +200,12 @@ export const Person: React.FC<{
       {[-1, 1].map((side) => (
         <mesh key={`arm${side}`} position={[side * 0.28, 0.98, 0]} rotation={[-side * swing, 0, side * 0.08]}>
           <boxGeometry args={[0.11, 0.55, 0.13]} />
-          <Std color={color} />
+          {silhouette ? <Shadow /> : <Std color={color} />}
         </mesh>
       ))}
       <mesh position={[0, 1.45, 0]}>
         <icosahedronGeometry args={[0.2, 0]} />
-        <Std color="#f1d3b5" />
+        {silhouette ? <Shadow /> : <Std color="#f1d3b5" />}
       </mesh>
     </group>
   );
@@ -300,6 +305,104 @@ export const Lantern: React.FC<{ position: Vec3; color?: string; glow?: number; 
       </mesh>
     )}
     <pointLight color={color} intensity={glow * 1.5} distance={6} decay={0} />
+  </group>
+);
+
+/** 街灯。glow で明るさ（0で消灯）。flicker にフレームを渡すと、ときどき明滅する */
+export const StreetLamp: React.FC<{ position: Vec3; height?: number; glow?: number; color?: string; flicker?: number; rotationY?: number }> = ({
+  position,
+  height = 4.2,
+  glow = 1,
+  color = "#ffe2b0",
+  flicker,
+  rotationY = 0,
+}) => {
+  // 明滅：ほとんど点いていて、ときどき一瞬暗くなる
+  const on = flicker === undefined ? 1 : random(`lamp-${Math.floor(flicker / 3)}`) < 0.1 ? 0.15 : 1;
+  const g = glow * on;
+  const target = useMemo(() => new THREE.Object3D(), []);
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <mesh position={[0, height / 2, 0]}>
+        <cylinderGeometry args={[0.07, 0.09, height, 6]} />
+        <Std color="#3a3d44" />
+      </mesh>
+      <mesh position={[0.25, height + 0.05, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
+        <Std color="#3a3d44" />
+      </mesh>
+      <mesh position={[0.5, height, 0]}>
+        <boxGeometry args={[0.42, 0.12, 0.3]} />
+        <meshBasicMaterial color={g > 0.2 ? color : "#555a60"} />
+      </mesh>
+      <primitive object={target} position={[0.9, 0, 0]} />
+      <spotLight position={[0.5, height - 0.1, 0]} target={target} angle={0.6} penumbra={0.8} intensity={12 * g} decay={0} distance={height * 3.5} color={color} />
+      {g > 0 && (
+        <mesh position={[0.6, height / 2, 0]}>
+          <coneGeometry args={[height * 0.45, height, 24, 1, true]} />
+          <meshBasicMaterial color={color} transparent opacity={0.04 * g} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+    </group>
+  );
+};
+
+/** 電柱（電線つき）。wireTo に隣の電柱の位置を渡すと、そこまで電線を張る */
+export const UtilityPole: React.FC<{ position: Vec3; height?: number; wireTo?: Vec3 }> = ({ position, height = 7, wireTo }) => {
+  const wire = useMemo(() => {
+    if (!wireTo) return null;
+    const a = new THREE.Vector3(position[0], position[1] + height - 0.4, position[2]);
+    const b = new THREE.Vector3(wireTo[0], wireTo[1] + height - 0.4, wireTo[2]);
+    const mid = a.clone().add(b).multiplyScalar(0.5).add(new THREE.Vector3(0, -0.6, 0));
+    return new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 16, 0.02, 4, false);
+  }, [position, wireTo, height]);
+  return (
+    <>
+      <group position={position}>
+        <mesh position={[0, height / 2, 0]}>
+          <cylinderGeometry args={[0.1, 0.14, height, 6]} />
+          <Std color="#6b6a66" />
+        </mesh>
+        <mesh position={[0, height - 0.4, 0]}>
+          <boxGeometry args={[1.4, 0.1, 0.1]} />
+          <Std color="#4a4945" />
+        </mesh>
+        <mesh position={[0.35, height - 1.1, 0.12]}>
+          <cylinderGeometry args={[0.18, 0.18, 0.45, 8]} />
+          <Std color="#7d7c78" />
+        </mesh>
+      </group>
+      {wire && (
+        <mesh geometry={wire}>
+          <meshBasicMaterial color="#111316" />
+        </mesh>
+      )}
+    </>
+  );
+};
+
+/** 鳥居 */
+export const Torii: React.FC<{ position: Vec3; rotationY?: number; color?: string; scale?: number }> = ({
+  position,
+  rotationY = 0,
+  color = "#c43b2e",
+  scale = 1,
+}) => (
+  <group position={position} rotation={[0, rotationY, 0]} scale={scale}>
+    {[-1.3, 1.3].map((x) => (
+      <mesh key={x} position={[x, 1.8, 0]}>
+        <cylinderGeometry args={[0.16, 0.2, 3.6, 8]} />
+        <Std color={color} />
+      </mesh>
+    ))}
+    <mesh position={[0, 3.75, 0]}>
+      <boxGeometry args={[4.0, 0.28, 0.4]} />
+      <Std color={color} />
+    </mesh>
+    <mesh position={[0, 3.1, 0]}>
+      <boxGeometry args={[3.2, 0.18, 0.3]} />
+      <Std color={color} />
+    </mesh>
   </group>
 );
 

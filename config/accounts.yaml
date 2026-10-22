@@ -11,6 +11,10 @@
 #   manga           … キャラを固定したAIのコマ画像をコマ送り・吹き出し・効果音で動かす漫画動画
 #   ai_video        … 全編AI映像（動画生成AI）＋ナレーション
 #
+# active   … false にすると、企画も動画も作らない（休止）
+# schedule … 企画を作る日。every: 2 なら2日に1回で、group 0 の組と group 1 の組が1日おきに交互に作る
+#            （省略時は毎日）。group 0 は 2026-10-22 など、group 1 はその翌日
+#
 # visual … 動画の見た目の方針。動画作成エージェントが毎回この方針にそろえる
 # voice  … ナレーションの声（VOICEVOX のキャラクター名・スタイル名・速さ）
 #          キャラクターごとに利用規約があるので、使う前に公式サイトで確認すること
@@ -37,6 +41,7 @@ accounts:
     accent: "#ff6a3d"
     voice: { speaker: 青山龍星, style: ノーマル, speed: 1.1 }
     postTime: "19:00"
+    schedule: { every: 2, group: 0 }
 
   - id: urban_legend
     name: 夜更けの都市伝説
@@ -44,7 +49,8 @@ accounts:
     concept: 日本や世界の都市伝説・不思議な話を、不穏な映像と朗読でじっくり聞かせる
     target: 10代後半〜30代の怖い話・オカルト好き
     tone: 低く静かな語り。ジャンプスケアに頼らず、じわじわ来る怖さ
-    production: ai_video
+    # 全編AI映像は費用が高いので、まずはポリゴン調3Dで作る（作り方を変えるときは ai_video に戻す）
+    production: polygon
     lengthSec: [65, 90]
     research:
       # 「-語句」で除外できる（マイクラの「都市伝説」動画が混ざるため）
@@ -55,10 +61,14 @@ accounts:
       - 心霊スポットなどへの立ち入りや迷惑行為をあおらない
       - 自傷・自殺を連想させる描写、過度にショッキングな描写をしない
       - 創作・伝承であることが分かる言い回しにする
-    visual: 暗く不穏な色調。霧・薄明かり・人のいない夜の風景。
+    visual: >-
+      ポリゴン調の、人のいない夜の日本（路地・街灯・電柱・踏切・団地・トンネル・山道・神社の鳥居など）。濃い霧と、黒・暗い青緑を基調にし、
+      明かりは街灯や窓の弱い光だけ。人物は顔の見えない黒い人影で、はっきり映さず遠くや物陰に置く。暗い赤は1場面に1か所だけ差し色に使う。
+      カメラはゆっくり動かし、じわじわ近づく。急に大きな顔や物が飛び出す驚かせ方はしない。画面の隅に「創作」「伝承」などの表記を出す。
     accent: "#c74b5a"
     voice: { speaker: 冥鳴ひまり, style: ノーマル, speed: 1.05 }
     postTime: "22:00"
+    schedule: { every: 2, group: 1 }
 
   - id: cosmos
     name: 宇宙と深海のふしぎ
@@ -81,6 +91,7 @@ accounts:
     accent: "#ffcf3f"
     voice: { speaker: 九州そら, style: ノーマル, speed: 1.15 }
     postTime: "20:00"
+    schedule: { every: 2, group: 0 }
 
   - id: manga_story
     name: 深夜コンビニ物語（仮）
@@ -103,6 +114,8 @@ accounts:
     accent: "#ffd84a"
     voice: { speaker: 白上虎太郎, style: ふつう, speed: 1.15 }
     postTime: "21:00"
+    # 漫画動画の作り方ができるまで休止
+    active: false
 
   - id: psychology
     name: 心理学のあるある
@@ -125,6 +138,7 @@ accounts:
     accent: "#12a89a"
     voice: { speaker: 春日部つむぎ, style: ノーマル, speed: 1.15 }
     postTime: "12:30"
+    schedule: { every: 2, group: 1 }
 
   - id: future
     name: 20XX年の日本
@@ -149,3 +163,5 @@ accounts:
     accent: "#3fd2ff"
     voice: { speaker: No.7, style: アナウンス, speed: 1.15 }
     postTime: "18:00"
+    # いまは休止（再開するときは active: true にし、schedule を付ける）
+    active: false

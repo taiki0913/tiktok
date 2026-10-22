@@ -1,5 +1,5 @@
 // 毎朝の企画づくり：競合調査 → 企画 → 保存 → 通知 を6アカウント分まわす。
-import type { Account } from "../config/accounts.js";
+import { isPlanningDay, type Account } from "../config/accounts.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { runPlanner } from "../planning/plannerAgent.js";
 import { runResearch } from "../research/researchAgent.js";
@@ -93,7 +93,12 @@ export async function runMorningPlanning(
 ): Promise<DayState> {
   const existing = await deps.store.getDay(date);
   const targets = deps.accounts.filter((a) => {
-    if (opts.onlyAccountIds && !opts.onlyAccountIds.includes(a.id)) return false;
+    // アカウントを指定したとき（お試し実行など）は、作る日でなくても作る
+    if (opts.onlyAccountIds) {
+      if (!opts.onlyAccountIds.includes(a.id)) return false;
+    } else if (!isPlanningDay(a, date) && existing?.accounts[a.id] === undefined) {
+      return false;
+    }
     const status = existing?.accounts[a.id]?.status;
     return opts.force || status === undefined || status === "planning" || status === "error";
   });
