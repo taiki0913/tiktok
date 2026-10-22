@@ -20,6 +20,24 @@ export function exportBaseName(account: Account): string {
   return `${account.postTime.replace(":", "")}_${account.name.replace(/[\\/:*?"<>|]/g, "_")}`;
 }
 
+/** 動画と投稿文を <exportDir>/<日付>/ に書き出し、保存したファイルの場所を返す */
+export async function writeExport(opts: {
+  exportDir: string;
+  date: string;
+  account: Account;
+  videoFile: string;
+  text: string;
+}): Promise<{ videoFile: string; textFile: string }> {
+  const dir = resolve(opts.exportDir, opts.date);
+  const base = exportBaseName(opts.account);
+  await mkdir(dir, { recursive: true });
+  const videoFile = join(dir, `${base}.mp4`);
+  const textFile = join(dir, `${base}.txt`);
+  await copyFile(opts.videoFile, videoFile);
+  await writeFile(textFile, `${opts.text}\n`, "utf8");
+  return { videoFile, textFile };
+}
+
 /** 公開OKの動画と投稿文を保存し、結果を記録して知らせる（例外は投げない） */
 export async function saveApprovedVideo(deps: SaveDeps, account: Account, date: string): Promise<void> {
   const s = (await deps.store.getDay(date))?.accounts[account.id];
@@ -28,16 +46,10 @@ export async function saveApprovedVideo(deps: SaveDeps, account: Account, date: 
   if (!p || p.status !== "approved" || !p.videoFile || !proposal) return;
 
   const text = postTextFor(proposal, p.script);
-  const dir = resolve(deps.exportDir, date);
-  const base = exportBaseName(account);
   let saved: SavedState;
   try {
-    await mkdir(dir, { recursive: true });
-    const videoFile = join(dir, `${base}.mp4`);
-    const textFile = join(dir, `${base}.txt`);
-    await copyFile(p.videoFile, videoFile);
-    await writeFile(textFile, `${text}\n`, "utf8");
-    saved = { status: "saved", videoFile, textFile, text };
+    const files = await writeExport({ exportDir: deps.exportDir, date, account, videoFile: p.videoFile, text });
+    saved = { status: "saved", ...files, text };
   } catch (e) {
     console.error(`[save] ${account.id}：保存に失敗`, e);
     saved = { status: "failed", text, error: e instanceof Error ? e.message : String(e) };

@@ -19,7 +19,8 @@
     "video:sample": "tsx src/cli/renderSample.ts",
     "icons": "tsx src/cli/renderIcons.ts",
     "posting:setup": "tsx src/cli/postingSetup.ts",
-    "posting:test": "tsx src/cli/postingTest.ts"
+    "posting:test": "tsx src/cli/postingTest.ts",
+    "export": "tsx src/cli/exportVideo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

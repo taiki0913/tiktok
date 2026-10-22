@@ -78,6 +78,7 @@ npm run produce:dry -- --account cosmos    # お試しで作った案Aから動�
 ```
 - `video:sample` は、VOICEVOX・BGM・動画の書き出しがPCで動くかの確認用です。`out\sample-future.mp4` ができれば成功です。初回は、書き出し用のChromeが自動でダウンロードされます（数分かかります）。
 - `produce:dry` の動画は `data\videos\` にできます。`--index 1` で案Bから作れます。
+- `npm run export -- --account cosmos` で、そのアカウントのいちばん新しい動画の投稿文（説明文＋ハッシュタグ）を表示し、動画と投稿文を保存先（`EXPORT_DIR`）に保存します。お試しで作った動画を投稿したいときに使います。
 
 ### 8. TikTokアカウントを作る
 6アカウント分のプロフィール（名前・ID・自己紹介・写真）の案と、収益化のための注意点を [docs/tiktok-accounts.md](docs/tiktok-accounts.md) にまとめています。写真は画像生成AIで作ります（プロンプトは [docs/icon-prompts.md](docs/icon-prompts.md)）。
