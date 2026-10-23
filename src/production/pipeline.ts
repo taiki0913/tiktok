@@ -78,7 +78,12 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       s.production ??= { status: "queued", version: 1, warnings: [], revisions: [] };
       fn(s.production);
     });
-    await notifier.productionUpdated(date, account, state);
+    // Slack に届かなくても（ネットが一時的に切れたなど）動画づくりは止めない。知らせはあとで送り直す
+    try {
+      await notifier.productionUpdated(date, account, state);
+    } catch (e) {
+      console.warn(`[produce:${account.id}] Slack に知らせられませんでした（あとで送り直します）`, e);
+    }
     return state;
   };
 

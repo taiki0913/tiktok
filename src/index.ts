@@ -13,6 +13,8 @@ import { dateInTz, daysBefore, hourInTz } from "./util/date.js";
 
 /** これより遅い時刻に起動した日は、取り戻し実行をしない（夜に企画が届いても使えないため） */
 const CATCH_UP_UNTIL_HOUR = 15;
+/** 朝の実行を逃していないか・送れていない Slack の知らせがないかを確かめる間隔 */
+const WATCH_INTERVAL_MS = 10 * 60_000;
 
 requireClaudeEnv();
 const accounts = await loadAccounts(env.ACCOUNTS_FILE);
@@ -70,9 +72,20 @@ const task = cron.schedule(env.MORNING_CRON, () => runToday("定時実行"), {
 const next = task.getNextRun();
 console.log(`[cron] 次回の企画づくり: ${next?.toLocaleString("ja-JP", { timeZone: env.TIMEZONE }) ?? "不明"}`);
 
-// PCの起動が予定時刻より遅れた日は、起動した時点で今日の分を作る
-const nextIsToday = next !== null && dateInTz(next, env.TIMEZONE) === today();
-const early = hourInTz(new Date(), env.TIMEZONE) < CATCH_UP_UNTIL_HOUR;
-if (!nextIsToday && early && !(await store.getDay(today()))) {
-  await runToday("起動時の取り戻し");
+/** 予定時刻を過ぎても今日の企画がまだなら作る（起動が遅れた日や、スリープで朝の実行を逃した日のため） */
+async function catchUp(reason: string): Promise<void> {
+  const next = task.getNextRun();
+  const nextIsToday = next !== null && dateInTz(next, env.TIMEZONE) === today();
+  const early = hourInTz(new Date(), env.TIMEZONE) < CATCH_UP_UNTIL_HOUR;
+  if (!nextIsToday && early && !(await store.getDay(today()))) await runToday(reason);
 }
+
+await catchUp("起動時の取り戻し");
+
+setInterval(() => {
+  void (async () => {
+    await catchUp("朝の実行を逃したため（スリープなど）");
+    // ネットが切れていた間に送れなかった、動画の完成・失敗の知らせを送り直す
+    for (const date of [daysBefore(today(), 1), today()]) await bot.sendPending(date);
+  })().catch((e) => console.warn("[watch] 確認に失敗", e));
+}, WATCH_INTERVAL_MS);

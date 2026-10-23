@@ -189,8 +189,10 @@ export interface SlackBot {
   deps: PlanningDeps;
   production: ProductionQueue;
   publisher: Publisher;
-  /** その日のメッセージを、今のプログラムの表示（ボタンなど）に描き直す */
+  /** その日のメッセージを、今のプログラムの表示（ボタンなど）に描き直し、送れていない知らせを送る */
   refreshDay: (date: string) => Promise<void>;
+  /** 送れていない動画の知らせ（完成・失敗）だけを送り直す */
+  sendPending: (date: string) => Promise<void>;
 }
 
 export function createSlackBot(opts: {
@@ -418,9 +420,23 @@ export function createSlackBot(opts: {
     const day = await store.getDay(date);
     for (const account of accounts) {
       const state = day?.accounts[account.id];
-      if (state?.slack) await notifier.accountUpdated(date, account, state);
+      if (!state?.slack) continue;
+      // 動画があれば、スレッドへの知らせ（まだ送れていなければ）も一緒に行う
+      if (state.production) await notifier.productionUpdated(date, account, state);
+      else await notifier.accountUpdated(date, account, state);
     }
   };
 
-  return { app, deps, production, publisher, refreshDay };
+  const sendPending = async (date: string): Promise<void> => {
+    const day = await store.getDay(date);
+    for (const account of accounts) {
+      const state = day?.accounts[account.id];
+      const p = state?.production;
+      if (state?.slack && p && (p.status === "review" || p.status === "failed") && !p.slackReviewTs) {
+        await notifier.productionUpdated(date, account, state);
+      }
+    }
+  };
+
+  return { app, deps, production, publisher, refreshDay, sendPending };
 }
