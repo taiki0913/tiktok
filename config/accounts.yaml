@@ -140,7 +140,8 @@ accounts:
     accent: "#12a89a"
     voice: { speaker: 春日部つむぎ, style: ノーマル, speed: 1.15 }
     postTime: "12:30"
-    # 毎日作る（schedule を省略すると毎日）
+    # 宇宙と深海（group 0）と交互に、2日に1回作る
+    schedule: { every: 2, group: 1 }
 
   - id: future
     name: 20XX年の日本

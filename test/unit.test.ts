@@ -53,8 +53,8 @@ test("accounts.yaml: 6アカウントがすべて読み込める", () => {
 
 test("企画を作る日：毎日のアカウントと2日に1回のアカウントがあり、休止中のアカウントは作らない", () => {
   const on = (date: string) => accounts.filter((a) => isPlanningDay(a, date)).map((a) => a.id).sort();
-  // 日本史・心理学は毎日、宇宙と深海は2日に1回（group 0）、都市伝説・漫画・未来は休止
-  assert.deepEqual(on("2026-10-24"), ["cosmos", "history", "psychology"]);
+  // 日本史は毎日、宇宙と深海（group 0）と心理学（group 1）は2日に1回で交互、都市伝説・漫画・未来は休止
+  assert.deepEqual(on("2026-10-24"), ["cosmos", "history"]);
   assert.deepEqual(on("2026-10-25"), ["history", "psychology"]);
   // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）
   assert.notDeepEqual(on("2026-10-31"), on("2026-11-01"));
