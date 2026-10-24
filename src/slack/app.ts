@@ -17,6 +17,8 @@ import {
 } from "../production/pipeline.js";
 import { isPostLocked, Publisher, type PostingDeps } from "../posting/publisher.js";
 import { saveApprovedVideo } from "../production/exporter.js";
+import { recordChoice } from "../series/series.js";
+import type { AudienceChoice } from "../domain.js";
 import { extractTikTokUrls, fetchTikTokEmbed } from "../research/tiktokOembed.js";
 import type { Store } from "../store/store.js";
 import { formatJpDate } from "../util/date.js";
@@ -33,6 +35,8 @@ import {
   REVISE_CALLBACK,
   reviewBlocks,
   reviseModal,
+  SERIES_CHOICE_CALLBACK,
+  seriesChoiceModal,
   summaryBlocks,
   VIDEO_REVISE_CALLBACK,
   videoReviseModal,
@@ -285,6 +289,33 @@ export function createSlackBot(opts: {
     await ack();
     const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
     background("再作成", planAccount(deps, findAccount(v.a), v.d));
+  });
+
+  // ---- 続きもの：前回のコメントの結果を受け取り、その選択で次の話の企画を作る ----
+  const chooseAndPlan = async (date: string, account: Account, choice: Omit<AudienceChoice, "at">): Promise<void> => {
+    const state = (await store.getDay(date))?.accounts[account.id];
+    if (state?.status !== "awaiting_choice" || !state.seriesAsk) return;
+    await recordChoice(store, account.id, state.seriesAsk.date, { ...choice, at: new Date().toISOString() });
+    await planAccount(deps, account, date);
+  };
+
+  app.action<BlockAction<ButtonAction>>(new RegExp(`^${ACTIONS.seriesChoice}:`), async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    if (v.c) background("続きものの企画", chooseAndPlan(v.d, findAccount(v.a), { pick: v.c }));
+  });
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.seriesChoiceOpen, async ({ ack, action, body, client }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    await client.views.open({ trigger_id: body.trigger_id, view: seriesChoiceModal(v.d, findAccount(v.a)) });
+  });
+
+  app.view(SERIES_CHOICE_CALLBACK, async ({ ack, view }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(view.private_metadata));
+    const note = view.state.values.note?.text?.value?.trim() ?? "";
+    background("続きものの企画", chooseAndPlan(v.d, findAccount(v.a), { pick: "other", note }));
   });
 
   app.action<BlockAction<ButtonAction>>(ACTIONS.openRevise, async ({ ack, action, body, client }) => {

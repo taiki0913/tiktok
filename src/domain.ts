@@ -52,7 +52,21 @@ export const PlanSchema = z.object({
   proposals: z.array(ProposalSchema).describe("方向性の異なる企画を3案"),
 });
 
-export type AccountStatus = "planning" | "awaiting_approval" | "approved" | "skipped" | "error";
+export type AccountStatus = "planning" | "awaiting_choice" | "awaiting_approval" | "approved" | "skipped" | "error";
+
+/** 続きもので、視聴者に聞いた2択 */
+export interface SeriesChoices {
+  a: string;
+  b: string;
+}
+
+/** オーナーが入力した、前回のコメントの結果 */
+export interface AudienceChoice {
+  /** A・B・other（自由入力）・auto（コメントがなかったので、おまかせ） */
+  pick: "A" | "B" | "other" | "auto";
+  note?: string;
+  at: string;
+}
 
 export type ProductionStatus =
   | "queued"
@@ -144,6 +158,10 @@ export interface AccountDayState {
   slack?: { channel: string; ts: string };
   error?: string;
   updatedAt: string;
+  /** 続きもの：この日に聞いている「前回のコメントの結果」（status が awaiting_choice のとき） */
+  seriesAsk?: { episode: number; date: string; choices: SeriesChoices };
+  /** 続きもの：この日に作った話について、視聴者が選んだもの */
+  audienceChoice?: AudienceChoice;
 }
 
 export interface DayState {

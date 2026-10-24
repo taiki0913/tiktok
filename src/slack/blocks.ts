@@ -20,8 +20,12 @@ export const ACTIONS = {
   postCancel: "post_cancel",
   postRetry: "post_retry",
   saveRetry: "save_retry",
+  /** 続きもの：前回のコメントの結果（A・B・おまかせ）。action_id は「series_choice:A」のように付ける */
+  seriesChoice: "series_choice",
+  seriesChoiceOpen: "series_choice_open",
 } as const;
 export const REVISE_CALLBACK = "revise_submit";
+export const SERIES_CHOICE_CALLBACK = "series_choice_submit";
 export const VIDEO_REVISE_CALLBACK = "video_revise_submit";
 
 /** ボタンに埋め込む値。d=日付, a=アカウントID, i=案の番号 */
@@ -29,6 +33,8 @@ export const ButtonValueSchema = z.object({
   d: z.string(),
   a: z.string(),
   i: z.number().int().optional(),
+  /** 続きもの：前回のコメントの結果 */
+  c: z.enum(["A", "B", "auto"]).optional(),
 });
 export type ButtonValue = z.infer<typeof ButtonValueSchema>;
 
@@ -317,6 +323,27 @@ export function accountBlocks(
       blocks.push(mrkdwn("⏳ 競合調査と企画づくりをしています…"));
       break;
 
+    case "awaiting_choice": {
+      const ask = state.seriesAsk;
+      blocks.push(
+        mrkdwn(
+          `💬 *第${ask?.episode ?? "?"}話のコメントは、どちらが多かったですか？*\n押すと、その選択で第${(ask?.episode ?? 0) + 1}話の企画を作ります。`,
+        ),
+      );
+      if (ask) {
+        blocks.push({
+          type: "actions",
+          elements: [
+            button(truncate(`A：${ask.choices.a}`, 70), `${ACTIONS.seriesChoice}:A`, { ...v, c: "A" }, "primary"),
+            button(truncate(`B：${ask.choices.b}`, 70), `${ACTIONS.seriesChoice}:B`, { ...v, c: "B" }, "primary"),
+            button("✏️ どちらでもない", ACTIONS.seriesChoiceOpen, v),
+            button("🤷 コメントがなかった", `${ACTIONS.seriesChoice}:auto`, { ...v, c: "auto" }),
+          ],
+        });
+      }
+      break;
+    }
+
     case "error":
       blocks.push(
         mrkdwn(`⚠️ 企画の作成に失敗しました\n\`\`\`${truncate(state.error ?? "不明なエラー", 1500)}\`\`\``),
@@ -385,6 +412,7 @@ export function accountBlocks(
 export function accountFallbackText(account: Account, state: AccountDayState): string {
   const status: Record<AccountDayState["status"], string> = {
     planning: "企画を作成中",
+    awaiting_choice: "前回のコメントの結果待ち",
     awaiting_approval: "企画の承認待ち",
     approved: "企画が決定しました",
     skipped: "今日はスキップ",
@@ -409,6 +437,8 @@ export function summaryBlocks(day: DayState, accounts: Account[]): Slack.KnownBl
       switch (s.status) {
         case "planning":
           return `⏳ ${a.name}：作成中…`;
+        case "awaiting_choice":
+          return `💬 ${a.name}：前回のコメントの結果待ち`;
         case "awaiting_approval":
           return `🟡 ${a.name}：承認待ち`;
         case "approved": {
@@ -453,6 +483,32 @@ export function reviseModal(date: string, account: Account): Slack.View {
           action_id: "text",
           multiline: true,
           placeholder: { type: "plain_text", text: "例：案Aの方向性で、もっと身近な題材にしてほしい" },
+        },
+      },
+    ],
+  };
+}
+
+/** 続きもの：前回のコメントの結果が A・B のどちらでもないとき */
+export function seriesChoiceModal(date: string, account: Account): Slack.View {
+  return {
+    type: "modal",
+    callback_id: SERIES_CHOICE_CALLBACK,
+    private_metadata: JSON.stringify({ d: date, a: account.id }),
+    title: { type: "plain_text", text: "コメントの結果" },
+    submit: { type: "plain_text", text: "この内容で作る" },
+    close: { type: "plain_text", text: "キャンセル" },
+    blocks: [
+      mrkdwn(`*${account.name}* の次の話を、コメントの内容に合わせて作ります。`),
+      {
+        type: "input",
+        block_id: "note",
+        label: { type: "plain_text", text: "コメントで多かった意見・次の話でやってほしいこと" },
+        element: {
+          type: "plain_text_input",
+          action_id: "text",
+          multiline: true,
+          placeholder: { type: "plain_text", text: "例：AとBの両方を試してほしい、という声が多かった" },
         },
       },
     ],

@@ -15,6 +15,10 @@ export class ConsoleNotifier implements PlanNotifier {
       console.log(`${head}：作成中…`);
       return;
     }
+    if (state.status === "awaiting_choice") {
+      console.log(`${head}：第${state.seriesAsk?.episode}話のコメントの結果待ち（Slack で選んでください）`);
+      return;
+    }
     if (state.status === "error") {
       console.log(`${head}：失敗 — ${state.error}`);
       return;

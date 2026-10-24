@@ -3,6 +3,7 @@ import { isPlanningDay, type Account } from "../config/accounts.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { runPlanner } from "../planning/plannerAgent.js";
 import { runResearch } from "../research/researchAgent.js";
+import { loadEpisodes, pendingEpisode, seriesBrief } from "../series/series.js";
 import type { Store } from "../store/store.js";
 import { mapWithLimit } from "../util/concurrency.js";
 import { daysBefore } from "../util/date.js";
@@ -33,6 +34,24 @@ export async function planAccount(
   revision?: string,
 ): Promise<AccountDayState> {
   const { store, notifier } = deps;
+
+  // 続きもの：前回の話のコメントの結果をまだ聞いていなければ、先にオーナーに聞く（企画は結果を受け取ってから作る）
+  let brief: string | undefined;
+  if (account.series) {
+    const episodes = await loadEpisodes(store, account, date);
+    const pending = pendingEpisode(episodes);
+    if (pending && revision === undefined) {
+      const asked = await store.updateAccount(date, account.id, (s) => {
+        s.status = "awaiting_choice";
+        s.seriesAsk = { episode: pending.number, date: pending.date, choices: pending.choices };
+        delete s.error;
+      });
+      await notifier.accountUpdated(date, account, asked);
+      return asked;
+    }
+    brief = seriesBrief(account, episodes);
+  }
+
   const before = await store.updateAccount(date, account.id, (s) => {
     s.status = "planning";
     delete s.error;
@@ -58,6 +77,7 @@ export async function planAccount(
       date,
       research,
       history: await store.recentDays(date, HISTORY_DAYS),
+      seriesBrief: brief,
       revision:
         revision !== undefined && before.proposals
           ? { instruction: revision, previous: before.proposals }

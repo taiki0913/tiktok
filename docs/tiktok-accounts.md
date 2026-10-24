@@ -35,7 +35,7 @@
 |---|---|---|---|---|
 | history | 知られざる日本史 | `shirarezaru_nihonshi` / `nihonshi_no_nazo` | 教科書に載らない日本史の謎と意外な真実を、1分の短編ドキュメンタリーで。毎日更新｜映像はCGによる再現です | `history.png` |
 | urban_legend | 夜更けの都市伝説 | `yofuke_toshidensetsu` / `yofuke_no_kaidan` | 夜更けにそっと聞く、日本と世界の都市伝説。毎晩更新｜お話は伝承・創作です｜映像はAIで生成しています | `urban_legend.png` |
-| cosmos | 宇宙と深海のふしぎ | `uchu_shinkai_fushigi` / `uchu_to_shinkai` | 宇宙と深海の「信じられないけど本当」を、数字とCGで体感。毎日更新｜数値はNASA・JAXAなどの公開情報から | `cosmos.png` |
+| cosmos | 深海8000mからの生還（続きもの） | `uchu_shinkai_fushigi` / `uchu_to_shinkai` | 水深8000mで動けなくなった潜水艇。パイロット見習いナギの次の行動を、あなたのコメントで決めて。物語はフィクション／深海の科学は本物 | `cosmos.png` |
 | manga_story | 深夜コンビニ物語 | `shinya_konbini_story` / `shinya_konbini` | 深夜のコンビニで働く大学生ミナトと、クセの強い常連客たちの1話完結ショート漫画。毎晩更新 | `manga_story.png` |
 | psychology | 心理学のあるある | `shinri_aruaru` / `shinrigaku_aruaru` | 日常の「あるある」を心理学でひもとく。明日がちょっとラクになるヒントを毎日お届けします | `psychology.png` |
 | future | 20XX年の日本 | `nihon_20xx` / `japan_20xx` | 公的統計と研究機関の予測で見る「〇年後の日本」。毎日更新｜出典は動画内に記載しています | `future.png` |

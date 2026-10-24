@@ -31,6 +31,17 @@ export const VideoScriptSchema = z.object({
   hashtags: z
     .array(z.string())
     .describe("投稿に付けるハッシュタグ。4〜6個。#は付けない。ジャンルの定番のタグと、この動画の題材のタグを混ぜる"),
+  choices: z
+    .object({
+      a: z.string().describe("選択肢Aの短い言い方（15字以内。例：ハッチを開ける）"),
+      b: z.string().describe("選択肢Bの短い言い方（15字以内）"),
+    })
+    .nullable()
+    .describe("続きもののときだけ：最後に視聴者に聞く2択。続きものでなければ null"),
+  episodeSummary: z
+    .string()
+    .nullable()
+    .describe("続きもののときだけ：この話のあらすじ（次の話に引き継ぐ状況・数字を含めて2〜3文）。続きものでなければ null"),
   sources: z.array(z.string()).describe("画面の最後に小さく出す出典（機関名・資料名）"),
   facts: z
     .array(
@@ -78,10 +89,23 @@ export interface ScriptRequest {
   account: Account;
   proposal: Proposal;
   revision?: { instruction: string; previous: VideoScript };
+  /** 続きもののとき：シリーズの説明とこれまでの話 */
+  seriesBrief?: string;
 }
+
+/** 続きものの台本の決まりごと */
+const SERIES_RULES = `# 続きものの台本
+- 主人公の一人称の語りにする。主人公の名前・性格・話し方を毎話そろえる。
+- 最初の場面（3秒以内）で、前回のあらすじを一言で伝える（第1話は状況説明）。タイトルは「第N話　〇〇」の形にする。
+- 前回の視聴者の選択の結果から話を始め、その選択を選んだことが話にちゃんと効いているようにする。
+- 最後の場面で、次の行動の2択を choices に書き、endQuestion は「A：〇〇　B：〇〇　コメントで決めて」の形にする。
+- 話の中の数字（酸素の残り時間・水深など）は、これまでの話と食い違わないようにする。
+- postCaption には「第N話」と、AかBかをコメントしてほしいことを入れる。
+- episodeSummary に、この話で起きたことと、話の終わりの状況（数字を含む）を書く。`;
 
 export async function runScriptAgent(req: ScriptRequest): Promise<VideoScript> {
   const parts = [`# 承認された企画\n${JSON.stringify(req.proposal, null, 2)}`];
+  if (req.seriesBrief) parts.unshift(req.seriesBrief);
   if (req.revision) {
     parts.push(
       `# 前回の台本\n${JSON.stringify(req.revision.previous, null, 2)}`,
@@ -94,7 +118,7 @@ export async function runScriptAgent(req: ScriptRequest): Promise<VideoScript> {
     label: `台本:${req.account.id}`,
     schema: VideoScriptSchema,
     effort: "high",
-    system: systemPrompt(req.account),
+    system: req.seriesBrief ? `${systemPrompt(req.account)}\n\n${SERIES_RULES}` : systemPrompt(req.account),
     prompt: parts.join("\n\n"),
   });
 }

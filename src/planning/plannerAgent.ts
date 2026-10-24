@@ -61,10 +61,20 @@ export interface PlanRequest {
   research: ResearchBrief;
   history: DayState[];
   revision?: { instruction: string; previous: Proposal[] };
+  /** 続きもののとき：シリーズの説明とこれまでの話 */
+  seriesBrief?: string;
 }
+
+/** 続きものの企画の決まりごと（通常の「3案は方向性を変える」の代わり） */
+const SERIES_PLANNING = `# 続きものの企画
+- ${PROPOSALS_PER_ACCOUNT}案は、どれも同じ「次の話」の、展開の違う案にする（案1は王道の展開、案2は意外な展開、案3は深海の科学の見せ場が多い展開）。
+- どの案も、前回の視聴者の選択の結果から始め、最後は次の2択で終える。outline の最後に、その2択（A・B）を書く。
+- title は「第N話　〇〇」の形にする。
+- 1話で話を進めすぎない。視聴者が「続きが見たい」と思うところで終える。`;
 
 export async function runPlanner(req: PlanRequest): Promise<Proposal[]> {
   const parts = [
+    ...(req.seriesBrief ? [req.seriesBrief] : []),
     `# 今日の日付\n${req.date}`,
     `# 競合調査の結果\n${JSON.stringify(req.research, null, 2)}`,
     historySection(req.account.id, req.history),
@@ -84,7 +94,7 @@ export async function runPlanner(req: PlanRequest): Promise<Proposal[]> {
     label: `企画:${req.account.id}`,
     schema: PlanSchema,
     effort: "high",
-    system: systemPrompt(req.account),
+    system: req.seriesBrief ? `${systemPrompt(req.account)}\n\n${SERIES_PLANNING}` : systemPrompt(req.account),
     prompt: parts.join("\n\n"),
   });
   if (proposals.length === 0) throw new Error("企画案が1つも返ってきませんでした");

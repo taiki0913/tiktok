@@ -52,6 +52,19 @@ const AccountSchema = z.object({
     speed: z.number().positive().default(1.15),
   }),
   postTime: z.string().regex(/^\d{2}:\d{2}$/),
+  /** 続きもの（コメントで展開が決まる物語）にするときの設定 */
+  series: z
+    .object({
+      /** シリーズ名（「第N話」の前に出す） */
+      title: z.string(),
+      /** 物語の前提・舞台 */
+      premise: z.string(),
+      /** 主人公（名前・性格・見た目・語り方） */
+      protagonist: z.string(),
+      /** 毎話の終わりに出す2択の決まりごと */
+      choiceRule: z.string(),
+    })
+    .optional(),
   /** false にすると、企画も動画も作らない（休止） */
   active: z.boolean().default(true),
   /** 企画を作る日。every 日に1回、group の組の日に作る（every: 2 なら group 0 と 1 が交互） */

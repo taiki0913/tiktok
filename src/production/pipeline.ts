@@ -12,6 +12,7 @@ import { JobRenderer, type RenderSettings } from "./renderer.js";
 import { factsToCheck, runScriptAgent, type VideoScript } from "./scriptAgent.js";
 import { runVideoAgent, verifyJobCode, type VideoAgentResult } from "./videoAgent.js";
 import { narrate, type VoicevoxClient } from "./voicevox.js";
+import { loadEpisodes, seriesBrief } from "../series/series.js";
 
 const PROJECT = process.cwd();
 export const JOBS_DIR = join(PROJECT, "video", "jobs");
@@ -123,6 +124,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       script = await runScriptAgent({
         account,
         proposal,
+        seriesBrief: account.series ? seriesBrief(account, await loadEpisodes(store, account, date)) : undefined,
         revision: revision && prev.script ? { instruction: revision.instruction, previous: prev.script } : undefined,
       });
     }
