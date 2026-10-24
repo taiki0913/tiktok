@@ -41,7 +41,7 @@ accounts:
     accent: "#ff6a3d"
     voice: { speaker: 青山龍星, style: ノーマル, speed: 1.1 }
     postTime: "19:00"
-    schedule: { every: 2, group: 0 }
+    # 毎日作る（schedule を省略すると毎日）
 
   - id: urban_legend
     name: 夜更けの都市伝説
@@ -69,6 +69,8 @@ accounts:
     voice: { speaker: 冥鳴ひまり, style: ノーマル, speed: 1.05 }
     postTime: "22:00"
     schedule: { every: 2, group: 1 }
+    # TikTok アカウントができるまで休止（再開するときは true にする）
+    active: false
 
   - id: cosmos
     name: 宇宙と深海のふしぎ
@@ -138,7 +140,7 @@ accounts:
     accent: "#12a89a"
     voice: { speaker: 春日部つむぎ, style: ノーマル, speed: 1.15 }
     postTime: "12:30"
-    schedule: { every: 2, group: 1 }
+    # 毎日作る（schedule を省略すると毎日）
 
   - id: future
     name: 20XX年の日本
