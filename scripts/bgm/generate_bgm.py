@@ -3,7 +3,8 @@
 自作の曲なので、利用規約の確認やクレジット表記は不要で、著作権の申し立ての心配もない。
 作り直すとき（開発者向け）:
     python -m venv .venv && .venv/bin/pip install numpy scipy
-    .venv/bin/python scripts/bgm/generate_bgm.py public/bgm
+    .venv/bin/python scripts/bgm/generate_bgm.py public/bgm               … すべての曲
+    .venv/bin/python scripts/bgm/generate_bgm.py public/bgm --moods-only  … 続きもの用の雰囲気ごとの曲だけ
 ffmpeg があれば mp3 に、無ければ wav で書き出す。
 """
 
@@ -358,6 +359,115 @@ def manga(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
     return master(buf, wet=0.2)
 
 
+# ---------------------------------------------------------------- 続きもの用：場面の雰囲気ごとの曲
+
+def tension(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """緊迫：ぶつかり合う低い持続音、心臓の鼓動のような低音、時計のような刻み"""
+    rng = np.random.default_rng(seed)
+    n = int(dur * SR)
+    buf = np.zeros((2, n))
+    place(buf, pad([midi_hz(root), midi_hz(root + 1), midi_hz(root + 7)], dur, 700, 5, 4, rng), 0, 0.3)
+    place(buf, sine_tone(midi_hz(root - 12), dur, 4, 4), 0, 0.32)
+    place(buf, sine_tone(midi_hz(root + 30), dur, 10, 4) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.11 * t_axis(n))), 0, 0.05)
+    beat = 60 / bpm
+    t = 2.0
+    while t < dur - 2:
+        grow = min(1.0, 0.55 + t / dur)  # 少しずつ強くなる
+        place(buf, kick(0.5), t, 0.5 * grow)
+        place(buf, kick(0.4), t + beat * 0.32, 0.32 * grow)
+        for k in range(4):
+            place(buf, hat(rng, 0.03), t + k * beat / 2 + beat / 4, 0.05, 0.5 * (-1) ** k)
+        t += beat * 2
+    return master(buf, wet=0.35, room=0.86, tone=7000)
+
+
+def danger(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """危険：速く刻む低音の反復、強い和音、警報のような高い音"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    bar = beat * 4
+    riff = [0, 0, 12, 0, 3, 0, 10, 7]
+    prog = [0, 0, -4, -2]
+    t = 0.0
+    i = 0
+    while t < dur - 1:
+        r = root + prog[i % len(prog)]
+        for s_, step in enumerate(riff):
+            place(buf, pluck(midi_hz(r - 12 + step), 0.4, rng, 0.985, 1800), t + s_ * beat / 2, 0.42, -0.15)
+        place(buf, pad([midi_hz(m) for m in chord(r, "min")], bar, 1600, 0.02, 0.6, rng), t, 0.22)
+        for b in range(4):
+            place(buf, kick(0.3), t + b * beat, 0.45)
+            place(buf, hat(rng, 0.05), t + b * beat + beat / 2, 0.08, 0.3)
+        if i % 2 == 1:
+            place(buf, fm_bell(midi_hz(r + 31), 1.2, ratio=1.5, index=4.0, decay=0.6), t + beat * 3, 0.1, 0.5)
+        t += bar
+        i += 1
+    return master(buf, wet=0.2, tone=9000)
+
+
+def sad(seed: int, progression: list[tuple[int, str]], bpm: float, dur: float) -> np.ndarray:
+    """切ない：ゆっくりのエレピの和音と、まばらな旋律"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    bar = beat * 4
+    t = 0.0
+    i = 0
+    while t < dur - 2:
+        r, kind = progression[i % len(progression)]
+        tones = chord(r, kind)
+        for k, m in enumerate(tones):
+            place(buf, epiano(midi_hz(m), bar * 1.4), t + k * 0.05, 0.18, -0.25 + 0.15 * k)
+        place(buf, sine_tone(midi_hz(r - 12), bar, 0.3, 1.0), t, 0.25)
+        melody = [tones[-1] + 12, tones[1] + 12, tones[2] + 12]
+        for k, m in enumerate(melody):
+            if rng.random() < 0.7:
+                place(buf, fm_bell(midi_hz(m), 3.0, ratio=2.0, index=1.2, decay=2.0), t + beat * (1 + k), 0.12, 0.3)
+        t += bar
+        i += 1
+    return master(buf, wet=0.45, room=0.88, tone=6000)
+
+
+def hope(seed: int, progression: list[tuple[int, str]], bpm: float, dur: float) -> np.ndarray:
+    """希望：明るい和音、上がっていくアルペジオ、少しずつ加わるリズム"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    bar = beat * 4
+    t = 0.0
+    i = 0
+    while t < dur - 2:
+        r, kind = progression[i % len(progression)]
+        tones = chord(r, kind)
+        place(buf, pad([midi_hz(m) for m in tones], bar + 1, 2200, 0.6, 1.0, rng), t, 0.22)
+        place(buf, sine_tone(midi_hz(r - 12), bar, 0.05, 0.4), t, 0.3)
+        arp = [tones[k % len(tones)] + 12 * (1 + k // len(tones)) for k in range(8)]
+        for step in range(8):
+            place(buf, pluck(midi_hz(arp[step]), 1.0, rng, 0.993, 5000), t + step * beat / 2, 0.2, 0.4 * np.sin(step))
+        if i >= 2:
+            for b in range(4):
+                if b % 2 == 0:
+                    place(buf, kick(0.35), t + b * beat, 0.28)
+                place(buf, hat(rng, 0.06), t + b * beat + beat / 2, 0.06, 0.3)
+        t += bar
+        i += 1
+    return master(buf, wet=0.3, tone=10000)
+
+
+# 場面の雰囲気（台本エージェントが場面ごとに選ぶ）→ 曲。public/bgm/<アカウント>/moods/<雰囲気>.mp3 に書き出す
+MOOD_TRACKS = {
+    "cosmos": {
+        "calm": lambda: cosmos(71, [(50, "sus4"), (48, "add9"), (45, "m7"), (47, "sus4")], 72),
+        "wonder": lambda: cosmos(72, [(48, "maj7"), (52, "m7"), (45, "maj7"), (50, "add9")], 72),
+        "tension": lambda: tension(73, 38, 62, 72),
+        "danger": lambda: danger(74, 40, 126, 72),
+        "sad": lambda: sad(75, [(45, "m7"), (41, "maj7"), (48, "maj7"), (43, "6")], 64, 72),
+        "hope": lambda: hope(76, [(48, "maj"), (43, "maj"), (45, "min"), (41, "maj")], 96, 72),
+    },
+}
+
+
 TRACKS = {
     "history": [
         ("koto-miyako-d", lambda: history(11, 50, 72, 100)),
@@ -395,27 +505,33 @@ def write_wav(path: Path, stereo: np.ndarray) -> None:
         w.writeframes(data.tobytes())
 
 
-def main(out_dir: str) -> None:
-    ffmpeg = shutil.which("ffmpeg")
-    for account, tracks in TRACKS.items():
-        folder = Path(out_dir) / account
-        folder.mkdir(parents=True, exist_ok=True)
-        for name, make in tracks:
-            audio = make()
-            wav = folder / f"{name}.wav"
-            write_wav(wav, audio)
-            if ffmpeg:
-                mp3 = folder / f"{name}.mp3"
-                # 曲ごとの音量差をなくすため、ラウドネスを -16 LUFS にそろえる
-                subprocess.run(
-                    [ffmpeg, "-v", "error", "-y", "-i", str(wav), "-af", "loudnorm=I=-16:TP=-2:LRA=11", "-ar", str(SR), "-b:a", "160k", str(mp3)],
-                    check=True,
-                )
-                wav.unlink()
-                print(f"{account}/{mp3.name}")
-            else:
-                print(f"{account}/{wav.name}")
+def export(folder: Path, name: str, audio: np.ndarray, label: str) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    wav = folder / f"{name}.wav"
+    write_wav(wav, audio)
+    if shutil.which("ffmpeg"):
+        mp3 = folder / f"{name}.mp3"
+        # 曲ごとの音量差をなくすため、ラウドネスを -16 LUFS にそろえる
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", str(wav), "-af", "loudnorm=I=-16:TP=-2:LRA=11", "-ar", str(SR), "-b:a", "160k", str(mp3)],
+            check=True,
+        )
+        wav.unlink()
+        print(f"{label}/{mp3.name}")
+    else:
+        print(f"{label}/{wav.name}")
+
+
+def main(out_dir: str, moods_only: bool) -> None:
+    if not moods_only:
+        for account, tracks in TRACKS.items():
+            for name, make in tracks:
+                export(Path(out_dir) / account, name, make(), account)
+    for account, moods in MOOD_TRACKS.items():
+        for mood, make in moods.items():
+            export(Path(out_dir) / account / "moods", mood, make(), f"{account}/moods")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "public/bgm")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    main(args[0] if args else "public/bgm", "--moods-only" in sys.argv)

@@ -4,7 +4,7 @@ import React from "react";
 import { AbsoluteFill, Html5Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { Caption, splitHighlights } from "./Caption";
 import { FONT_FAMILY, useFontsReady } from "./fonts";
-import type { JobData } from "./job";
+import { BGM_CROSSFADE_FRAMES, type JobData } from "./job";
 
 const BGM_VOLUME = 0.12;
 
@@ -100,7 +100,23 @@ export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = (
             <Html5Audio src={staticFile(s.audio)} />
           </Sequence>
         ))}
-      {job.bgm && <Html5Audio src={staticFile(job.bgm)} volume={bgmVolume} loop />}
+      {job.bgmCues && job.bgmCues.length > 0
+        ? job.bgmCues.map((c, i) => (
+            <Sequence key={i} from={c.from} durationInFrames={c.durationInFrames} name={`BGM ${c.mood}`}>
+              <Html5Audio
+                src={staticFile(c.src)}
+                loop
+                volume={(f) =>
+                  BGM_VOLUME *
+                  interpolate(f, [0, BGM_CROSSFADE_FRAMES, c.durationInFrames - BGM_CROSSFADE_FRAMES, c.durationInFrames], [0, 1, 1, 0], {
+                    extrapolateLeft: "clamp",
+                    extrapolateRight: "clamp",
+                  })
+                }
+              />
+            </Sequence>
+          ))
+        : job.bgm && <Html5Audio src={staticFile(job.bgm)} volume={bgmVolume} loop />}
     </AbsoluteFill>
   );
 };

@@ -107,6 +107,7 @@ function jobPrompt(account: Account, job: JobData, jobRel: string, revision?: st
       (s) =>
         `${s.index + 1}. フレーム ${s.from}〜${s.from + s.durationInFrames - 1}（${(s.durationInFrames / fps).toFixed(1)}秒）\n` +
         `   字幕: ${s.caption}\n   読み上げ: ${s.narration}\n   映像の指示: ${s.visual}\n` +
+        (s.mood ? `   雰囲気: ${s.mood}（BGMもこの雰囲気。明るさ・色・カメラの動きを合わせる）\n` : "") +
         `   画面に出すもの: ${s.onScreen.length ? s.onScreen.join(" / ") : "なし"}`,
     )
     .join("\n");

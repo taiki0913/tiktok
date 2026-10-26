@@ -5,6 +5,9 @@ import { PRODUCTION_STYLES, type Account } from "../config/accounts.js";
 import type { Proposal } from "../domain.js";
 import { generateStructured } from "../llm/claude.js";
 
+/** 場面の雰囲気。続きものでは、雰囲気ごとに BGM を切り替える */
+export const SCENE_MOODS = ["calm", "wonder", "tension", "danger", "sad", "hope"] as const;
+
 /** 読み上げの速さの目安（VOICEVOX・速さ1.1〜1.15で、1秒あたりの文字数） */
 const CHARS_PER_SEC = 7;
 
@@ -21,6 +24,11 @@ export const VideoScriptSchema = z.object({
         caption: z.string().describe("画面に出す字幕。読み上げを短くまとめ、強調したい語を[ ]で囲む。30字以内"),
         visual: z.string().describe("この場面の映像の指示（何が映り、カメラがどう動き、何が起きるか）"),
         onScreen: z.array(z.string()).describe("画面に出す数字・ラベル・グラフの中身（なければ空）"),
+        mood: z
+          .enum(SCENE_MOODS)
+          .describe(
+            "この場面の雰囲気（BGMを選ぶのに使う）。calm=静か・落ち着き、wonder=美しさ・神秘、tension=緊迫・不安、danger=危険・急いで動く、sad=切ない・孤独、hope=希望・前向き",
+          ),
       }),
     )
     .describe("6〜12場面。1場面は5〜10秒の分量"),
@@ -100,6 +108,7 @@ const SERIES_RULES = `# 続きものの台本
 - 前回の視聴者の選択の結果から話を始め、その選択を選んだことが話にちゃんと効いているようにする。
 - 最後の場面で、次の行動の2択を choices に書き、endQuestion は「A：〇〇　B：〇〇　コメントで決めて」の形にする。
 - 話の中の数字（酸素の残り時間・水深など）は、これまでの話と食い違わないようにする。
+- 各場面の mood で BGM が切り替わる。気持ちの流れに合わせて選び、同じ気持ちが続く場面は同じ mood にする（1話で3〜4種類まで）。
 - postCaption には「第N話」と、AかBかをコメントしてほしいことを入れる。
 - episodeSummary に、この話で起きたことと、話の終わりの状況（数字を含む）を書く。`;
 

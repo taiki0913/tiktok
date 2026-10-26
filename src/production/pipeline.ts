@@ -6,7 +6,7 @@ import { CODE_PRODUCIBLE, type Account } from "../config/accounts.js";
 import type { AccountDayState, ProductionState } from "../domain.js";
 import type { Store } from "../store/store.js";
 import { Mutex } from "../util/concurrency.js";
-import { computeTimeline, DEFAULT_TIMELINE, type JobData } from "../../video/kit/job.js";
+import { computeBgmCues, computeTimeline, DEFAULT_TIMELINE, type BgmCue, type JobData } from "../../video/kit/job.js";
 import { writeJobFiles } from "./jobFiles.js";
 import { JobRenderer, type RenderSettings } from "./renderer.js";
 import { factsToCheck, runScriptAgent, type VideoScript } from "./scriptAgent.js";
@@ -49,6 +49,28 @@ export async function pickBgm(accountId: string, seed: string, bgmDir = BGM_DIR)
   let hash = 0;
   for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return join(bgmDir, accountId, files[hash % files.length]!);
+}
+
+/**
+ * 場面の雰囲気ごとの曲（public/bgm/<アカウントID>/moods/<雰囲気>.mp3）。雰囲気 → 曲のファイル。
+ * 同じ雰囲気の曲が複数あれば（tension-2.mp3 など）、ジョブごとに1曲選ぶ。
+ */
+export async function moodTracks(accountId: string, seed: string, bgmDir = BGM_DIR): Promise<Record<string, string>> {
+  const dir = join(bgmDir, accountId, "moods");
+  let files: string[];
+  try {
+    files = (await readdir(dir)).filter((f) => AUDIO_EXT.test(f)).sort();
+  } catch {
+    return {};
+  }
+  const byMood = new Map<string, string[]>();
+  for (const f of files) {
+    const mood = f.replace(AUDIO_EXT, "").split("-")[0]!;
+    byMood.set(mood, [...(byMood.get(mood) ?? []), f]);
+  }
+  let hash = 0;
+  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return Object.fromEntries([...byMood].map(([mood, list]) => [mood, join(dir, list[hash % list.length]!)]));
 }
 
 /**
@@ -143,17 +165,32 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       { client: deps.voicevox, publicDir, relDir: "" },
     );
     const warnings = narration.warning ? [narration.warning] : [];
-    const bgmSrc = await pickBgm(account.id, jobId);
-    let bgm: string | null = null;
-    if (bgmSrc) {
-      bgm = `bgm${extname(bgmSrc).toLowerCase()}`;
-      await copyFile(bgmSrc, join(publicDir, bgm));
-    } else {
-      warnings.push(`BGM がありません（public/bgm/${account.id}/ に音源を入れてください）`);
-    }
-
     // 3. ジョブ（設計図）を書き出す
     const timeline = computeTimeline(narration.clips.map((c) => c.durationSec), DEFAULT_TIMELINE);
+
+    // BGM：雰囲気ごとの曲があれば場面ごとに切り替え、なければアカウントの曲を1曲通しで流す
+    let bgm: string | null = null;
+    let bgmCues: BgmCue[] | undefined;
+    const moods = await moodTracks(account.id, jobId);
+    if (Object.keys(moods).length > 0) {
+      const names = Object.fromEntries(Object.entries(moods).map(([mood, src]) => [mood, `bgm-${mood}${extname(src).toLowerCase()}`]));
+      bgmCues = computeBgmCues(
+        script.scenes.map((s, i) => ({ from: timeline.scenes[i]!.from, mood: s.mood })),
+        timeline.durationInFrames,
+        names,
+      );
+      for (const mood of new Set(bgmCues.map((c) => c.mood))) await copyFile(moods[mood]!, join(publicDir, names[mood]!));
+    }
+    if (!bgmCues || bgmCues.length === 0) {
+      bgmCues = undefined;
+      const bgmSrc = await pickBgm(account.id, jobId);
+      if (bgmSrc) {
+        bgm = `bgm${extname(bgmSrc).toLowerCase()}`;
+        await copyFile(bgmSrc, join(publicDir, bgm));
+      } else {
+        warnings.push(`BGM がありません（public/bgm/${account.id}/ に音源を入れてください）`);
+      }
+    }
     const job: JobData = {
       id: jobId,
       accountId: account.id,
@@ -170,9 +207,11 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         visual: s.visual,
         onScreen: s.onScreen,
         audio: narration.clips[i]!.file,
+        ...(s.mood ? { mood: s.mood } : {}),
       })),
       endCard: { from: timeline.endCardFrom, question: script.endQuestion, sources: script.sources },
       bgm,
+      ...(bgmCues ? { bgmCues } : {}),
       // ナレーションのクレジットは動画には入れず、投稿文に入れる
       credits: [],
       accent: account.accent,

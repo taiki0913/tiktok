@@ -17,7 +17,7 @@ const cosmos = accounts.find((a) => a.id === "cosmos")!;
 const script = (n: number, a: string, b: string) =>
   ({
     title: `第${n}話　テスト`,
-    scenes: [{ narration: "n", caption: "c", visual: "v", onScreen: [] }],
+    scenes: [{ narration: "n", caption: "c", visual: "v", onScreen: [], mood: "tension" }],
     endQuestion: `A：${a}　B：${b}　コメントで決めて`,
     sources: [],
     facts: [],
