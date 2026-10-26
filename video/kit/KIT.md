@@ -63,11 +63,15 @@
 | `Kofun` | position, rotationY?, size?, color? | 前方後円墳 |
 | `Mountain` | position, radius?, height?, color?, snow? | 山 |
 | `Rock` | position, size?, color?, seed? | 岩 |
+| `Character` | position, rotationY?, scale?, expression?, frame?, talking?, look?, headTurn?, pose?: "stand"/"sit", headset?, colors? | 顔のある主人公（黒髪のボブ・オレンジのパイロットスーツ）。expression は neutral/smile/worried/scared/surprised/determined/sad/relieved。frame を渡すと、まばたきと呼吸をする。talking の間は口が動く。look は目線 [左右, 上下]（-1〜1）。顔は +Z を向く。頭の中心は、座り（sit）で y≈1.2、立ちで y≈1.55 |
+| `Cockpit` | frame, power?, alarm?, windowGlow? | 潜水艇の操縦席（球形の殻の中。中心 y=0.9・半径1.5）。Character を原点に pose="sit" で座らせると、+Z の窓と操縦盤のほうを向く。power で照明と画面の明るさ（0で真っ暗）、alarm で赤い警告灯が点滅、windowGlow で窓の外の明るさ |
 | `Fish` | position, rotationY?, color?, scale?, frame? | 魚（+X 方向が頭） |
 | `Jellyfish` | position, frame, color?, scale? | 光るクラゲ |
 | `Submersible` | position, frame, lightPower?, lightTarget?, scale? | 潜水艇とライト |
 | `Planet` | position, radius, color, color2?, detail?, ring? | 惑星（ポリゴン調・輪も可） |
 | `Sun` | position, radius, color?, intensity? | 光る恒星 |
+
+**主人公の撮り方**：顔のアップは、座りなら camera を [0.1, 1.25, 0.75]・target を [0, 1.2, 0]・fov 60 くらいにする（Canvas の camera に near: 0.05 を付ける）。全身は camera [0, 1.05, 1.25]・target [0, 0.9, -0.2]。窓の外を見る場面は、肩越しに camera [-0.5, 1.4, -0.9]・target [0, 0.75, 1.3]。表情は場面の気持ちに合わせて変え、毎回1回は顔のアップを入れる。ナレーションが心の声のときは talking にせず、無線などで声に出して話す場面だけ talking にする。
 
 単純な形は three.js の要素を直接使ってよい（例：`<mesh><boxGeometry args={[1,1,1]} /><meshStandardMaterial color="#888" flatShading /></mesh>`）。ポリゴン調にするため `flatShading` を付ける。
 

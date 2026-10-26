@@ -37,7 +37,7 @@ async function addEpisode(store: Store, date: string, s: VideoScript | undefined
 
 test("accounts.yaml：宇宙と深海は続きもので、主人公と2択の決まりごとがある", () => {
   assert.equal(cosmos.series?.title, "深海8000mからの生還");
-  assert.match(cosmos.series?.protagonist ?? "", /ナギ/);
+  assert.match(cosmos.series?.protagonist ?? "", /シズク/);
   // 参考にしたアカウントの主人公と名前がかぶらないこと
   for (const a of accounts) assert.doesNotMatch(JSON.stringify(a), /湊|ミナト/, a.id);
 });
