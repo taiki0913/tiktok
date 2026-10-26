@@ -58,6 +58,10 @@ function logUsage(label: string, usage: Anthropic.Beta.BetaUsage): void {
   );
 }
 
+/** スキーマどおりの JSON を返させるときの出力の上限（考える分も含む） */
+const STRUCTURED_MAX_TOKENS = 64000;
+const STRUCTURED_OUTPUTS_BETA = "structured-outputs-2025-12-15";
+
 /** スキーマどおりの JSON を返させる */
 export async function generateStructured<T extends z.ZodType>(opts: {
   label: string;
@@ -66,10 +70,12 @@ export async function generateStructured<T extends z.ZodType>(opts: {
   prompt: string;
   effort?: Effort;
 }): Promise<z.infer<T>> {
-  const response = await getClient().beta.messages.parse({
+  // 考える量が多い依頼（続きものの企画など）は 16000 トークンでは足りないことがあるので、上限を大きくする。
+  // 上限が大きいと時間がかかることがあるため、ストリーミングで受け取る（使った分だけ課金される）
+  const stream = getClient().beta.messages.stream({
     model: env.CLAUDE_MODEL,
-    max_tokens: 16000,
-    betas: [FALLBACK_BETA],
+    max_tokens: STRUCTURED_MAX_TOKENS,
+    betas: [FALLBACK_BETA, STRUCTURED_OUTPUTS_BETA],
     fallbacks: "default",
     thinking: { type: "adaptive" },
     output_config: {
@@ -79,12 +85,21 @@ export async function generateStructured<T extends z.ZodType>(opts: {
     system: opts.system,
     messages: [{ role: "user", content: opts.prompt }],
   });
+  const response = await stream.finalMessage();
   logUsage(opts.label, response.usage);
   assertUsableStop(response, opts.label);
-  if (response.parsed_output == null) {
+  const text = response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
     throw new ClaudeResponseError(`[${opts.label}] 出力をJSONとして読み取れませんでした`);
   }
-  return response.parsed_output as z.infer<T>;
+  const result = opts.schema.safeParse(data);
+  if (!result.success) {
+    throw new ClaudeResponseError(`[${opts.label}] 出力の形が決めた形と違います：${result.error.message.slice(0, 500)}`);
+  }
+  return result.data as z.infer<T>;
 }
 
 /** Web検索を使って調べ、文章で結果を返させる */
