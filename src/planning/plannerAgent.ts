@@ -63,6 +63,8 @@ export interface PlanRequest {
   revision?: { instruction: string; previous: Proposal[] };
   /** 続きもののとき：シリーズの説明とこれまでの話 */
   seriesBrief?: string;
+  /** これまでのレビューからの学び */
+  lessons?: string;
 }
 
 /** 続きものの企画の決まりごと（通常の「3案は方向性を変える」の代わり） */
@@ -78,6 +80,7 @@ export async function runPlanner(req: PlanRequest): Promise<Proposal[]> {
     `# 今日の日付\n${req.date}`,
     `# 競合調査の結果\n${JSON.stringify(req.research, null, 2)}`,
     historySection(req.account.id, req.history),
+    ...(req.lessons ? [req.lessons] : []),
   ];
   if (req.revision) {
     const prev = req.revision.previous.map((p, i) => `${i + 1}. ${p.title}：${p.summary}`).join("\n");

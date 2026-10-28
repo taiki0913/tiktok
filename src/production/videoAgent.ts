@@ -202,6 +202,8 @@ export async function runVideoAgent(opts: {
   jobDir: string;
   renderer: JobRenderer;
   revision?: string;
+  /** これまでのレビューからの学び（映像） */
+  lessons?: string;
 }): Promise<VideoAgentResult> {
   const { account, job, jobDir, renderer } = opts;
   const jobRel = relative(ROOT, jobDir).split("\\").join("/");
@@ -231,7 +233,7 @@ export async function runVideoAgent(opts: {
     cache_control: { type: "ephemeral" },
     system: systemPrompt(kitGuide),
     tools,
-    messages: [{ role: "user", content: jobPrompt(account, job, jobRel, opts.revision) }],
+    messages: [{ role: "user", content: [jobPrompt(account, job, jobRel, opts.revision), opts.lessons ?? ""].filter(Boolean).join("\n\n") }],
   });
 
   let costUsd: number | null = 0;

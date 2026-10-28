@@ -172,6 +172,16 @@ export interface DayState {
   allDecidedNotified?: boolean;
 }
 
+/** レビューから得た、次の動画に活かす学び */
+export interface Lesson {
+  text: string;
+  /** 企画・台本・映像・投稿のどこに効く学びか */
+  target: "plan" | "script" | "visual" | "post";
+  /** どの日の動画のレビューから得たか */
+  from: string;
+  at: string;
+}
+
 export interface ReferenceVideo {
   accountId: string;
   url: string;

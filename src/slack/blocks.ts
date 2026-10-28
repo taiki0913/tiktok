@@ -3,8 +3,10 @@ import type { types as Slack } from "@slack/bolt";
 import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
 import { env } from "../config/env.js";
-import type { AccountDayState, DayState, PostState, ProductionState, Proposal, SavedState } from "../domain.js";
+import type { AccountDayState, DayState, Lesson, PostState, ProductionState, Proposal, SavedState } from "../domain.js";
 import { isPostLocked } from "../posting/publisher.js";
+import { LESSON_LABELS } from "../review/lessons.js";
+import type { Review } from "../review/reviewAgent.js";
 import { formatJpDate, formatJpDateTime } from "../util/date.js";
 
 export const ACTIONS = {
@@ -23,6 +25,8 @@ export const ACTIONS = {
   /** 続きもの：前回のコメントの結果（A・B・おまかせ）。action_id は「series_choice:A」のように付ける */
   seriesChoice: "series_choice",
   seriesChoiceOpen: "series_choice_open",
+  /** 動画を厳しくレビューする（分析の数字がなくても、静止画と台本から） */
+  critique: "video_critique",
 } as const;
 export const REVISE_CALLBACK = "revise_submit";
 export const SERIES_CHOICE_CALLBACK = "series_choice_submit";
@@ -200,7 +204,11 @@ export function reviewBlocks(date: string, account: Account, p: ProductionState)
   if (notes.length > 0) blocks.push(context(notes.join("　/　")));
   blocks.push({
     type: "actions",
-    elements: [button("✅ 公開OK", ACTIONS.videoApprove, v, "primary"), button("✏️ 作り直す", ACTIONS.videoReviseOpen, v)],
+    elements: [
+      button("✅ 公開OK", ACTIONS.videoApprove, v, "primary"),
+      button("✏️ 作り直す", ACTIONS.videoReviseOpen, v),
+      button("🔍 厳しくレビュー", ACTIONS.critique, v),
+    ],
   });
   return blocks;
 }
@@ -224,6 +232,12 @@ function approvedBlocks(v: { d: string; a: string }, account: Account, p: Produc
     );
   }
   if (p.post) blocks.push(...postBlocks(v, p.post));
+  if (saved?.status === "saved") {
+    blocks.push(
+      context("📊 投稿して1〜2日たったら、TikTok Studio のこの動画の分析画面のスクリーンショットを、このスレッドに貼ってください。数字を見て厳しくレビューし、次の動画に生かします"),
+      { type: "actions", elements: [button("🔍 数字なしでレビュー", ACTIONS.critique, v)] },
+    );
+  }
   return blocks;
 }
 
@@ -513,6 +527,30 @@ export function seriesChoiceModal(date: string, account: Account): Slack.View {
       },
     ],
   };
+}
+
+/** レビューの結果 */
+export function critiqueBlocks(date: string, r: Review, added: Lesson[]): Slack.KnownBlock[] {
+  const m = r.metrics;
+  const nums = [
+    m.views != null ? `再生 ${m.views.toLocaleString("ja-JP")}` : "",
+    m.avgWatchSec != null ? `平均視聴 ${m.avgWatchSec}秒` : "",
+    m.fullWatchPercent != null ? `最後まで ${m.fullWatchPercent}%` : "",
+  ].filter(Boolean);
+  const blocks: Slack.KnownBlock[] = [
+    mrkdwn(`🔍 *厳しめレビュー*（${formatJpDate(date)}の動画・*${r.score}/10*）\n*${r.verdict}*`),
+  ];
+  if (nums.length > 0 || m.other) blocks.push(context(`📊 ${[...nums, m.other].filter(Boolean).join("　/　")}`));
+  blocks.push(
+    mrkdwn(`*どこで見るのをやめられたか*\n${r.dropOff}`),
+    mrkdwn(`*問題点*\n${r.problems.map((p) => `• *${p.when}*：${p.issue}`).join("\n")}`),
+    mrkdwn(`*次の動画で変えること*\n${r.fixes.map((f, i) => `${i + 1}. [${LESSON_LABELS[f.target]}] ${f.action}`).join("\n")}`),
+  );
+  if (r.keep.length > 0) blocks.push(mrkdwn(`*良かった点*\n${r.keep.map((k) => `• ${k}`).join("\n")}`));
+  if (added.length > 0) {
+    blocks.push(context(`📝 学びに追加しました（次の企画・台本・映像に反映します）：${added.map((l) => `[${LESSON_LABELS[l.target]}] ${l.text}`).join("　")}`));
+  }
+  return blocks;
 }
 
 export function referencePromptBlocks(

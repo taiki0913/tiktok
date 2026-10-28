@@ -99,6 +99,8 @@ export interface ScriptRequest {
   revision?: { instruction: string; previous: VideoScript };
   /** 続きもののとき：シリーズの説明とこれまでの話 */
   seriesBrief?: string;
+  /** これまでのレビューからの学び */
+  lessons?: string;
 }
 
 /** 続きものの台本の決まりごと */
@@ -115,6 +117,7 @@ const SERIES_RULES = `# 続きものの台本
 export async function runScriptAgent(req: ScriptRequest): Promise<VideoScript> {
   const parts = [`# 承認された企画\n${JSON.stringify(req.proposal, null, 2)}`];
   if (req.seriesBrief) parts.unshift(req.seriesBrief);
+  if (req.lessons) parts.push(req.lessons);
   if (req.revision) {
     parts.push(
       `# 前回の台本\n${JSON.stringify(req.revision.previous, null, 2)}`,

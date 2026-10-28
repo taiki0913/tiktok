@@ -69,7 +69,15 @@ export async function generateStructured<T extends z.ZodType>(opts: {
   system: string;
   prompt: string;
   effort?: Effort;
+  /** 一緒に見せる画像（動画の静止画・分析画面のスクリーンショットなど） */
+  images?: { mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp"; data: string; label?: string }[];
 }): Promise<z.infer<T>> {
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [];
+  for (const img of opts.images ?? []) {
+    if (img.label) content.push({ type: "text", text: img.label });
+    content.push({ type: "image", source: { type: "base64", media_type: img.mediaType, data: img.data } });
+  }
+  content.push({ type: "text", text: opts.prompt });
   // 考える量が多い依頼（続きものの企画など）は 16000 トークンでは足りないことがあるので、上限を大きくする。
   // 上限が大きいと時間がかかることがあるため、ストリーミングで受け取る（使った分だけ課金される）
   const stream = getClient().beta.messages.stream({
@@ -83,7 +91,7 @@ export async function generateStructured<T extends z.ZodType>(opts: {
       format: betaZodOutputFormat(opts.schema),
     },
     system: opts.system,
-    messages: [{ role: "user", content: opts.prompt }],
+    messages: [{ role: "user", content }],
   });
   const response = await stream.finalMessage();
   logUsage(opts.label, response.usage);

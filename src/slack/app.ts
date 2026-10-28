@@ -18,6 +18,9 @@ import {
 import { isPostLocked, Publisher, type PostingDeps } from "../posting/publisher.js";
 import { saveApprovedVideo } from "../production/exporter.js";
 import { recordChoice } from "../series/series.js";
+import { runReview, type ReviewInput } from "../review/reviewAgent.js";
+import { env } from "../config/env.js";
+import { dateInTz, daysBefore } from "../util/date.js";
 import type { AudienceChoice } from "../domain.js";
 import { extractTikTokUrls, fetchTikTokEmbed } from "../research/tiktokOembed.js";
 import type { Store } from "../store/store.js";
@@ -32,6 +35,7 @@ import {
   isProductionBusy,
   ReferenceValueSchema,
   referencePromptBlocks,
+  critiqueBlocks,
   REVISE_CALLBACK,
   reviewBlocks,
   reviseModal,
@@ -43,6 +47,16 @@ import {
 } from "./blocks.js";
 
 const { App } = bolt;
+
+/** Slack に貼られたファイル（必要なところだけ） */
+interface SlackFile {
+  mimetype?: string;
+  url_private?: string;
+  url_private_download?: string;
+}
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+/** Claude に渡せる画像の大きさの上限 */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** Slack に企画と動画づくりの状態を反映する */
 class SlackNotifier implements PlanNotifier, ProductionNotifier {
@@ -291,6 +305,67 @@ export function createSlackBot(opts: {
     background("再作成", planAccount(deps, findAccount(v.a), v.d));
   });
 
+  // ---- レビュー：分析画面のスクリーンショット（あれば）・動画の静止画・台本から厳しく見て、学びを次に生かす ----
+  const critique = async (date: string, account: Account, screenshots: ReviewInput["screenshots"], note?: string): Promise<void> => {
+    const state = (await store.getDay(date))?.accounts[account.id];
+    if (!state?.slack || !state.production?.jobId) return;
+    const thread = { channel: state.slack.channel, thread_ts: state.slack.ts };
+    await app.client.chat.postMessage({ ...thread, text: `🔍 ${account.name} の動画をレビューしています…（1〜2分）` });
+    try {
+      const review = await runReview({
+        account,
+        date,
+        state,
+        screenshots,
+        note,
+        lessons: await store.getLessons(account.id),
+        render: opts.production.render,
+      });
+      const at = new Date().toISOString();
+      const added = review.lessons.map((l) => ({ ...l, from: date, at }));
+      await store.addLessons(account.id, added);
+      await app.client.chat.postMessage({ ...thread, text: `レビュー：${review.verdict}`, blocks: critiqueBlocks(date, review, added) });
+    } catch (e) {
+      console.error(`[review:${account.id}]`, e);
+      await app.client.chat.postMessage({ ...thread, text: `⚠️ レビューに失敗しました：${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
+
+  app.action<BlockAction<ButtonAction>>(ACTIONS.critique, async ({ ack, action }) => {
+    await ack();
+    const v = ButtonValueSchema.parse(JSON.parse(action.value ?? "{}"));
+    background("レビュー", critique(v.d, findAccount(v.a), []));
+  });
+
+  /** スレッドの親メッセージから、どの日のどのアカウントの話かを探す（直近30日） */
+  const findThreadOwner = async (threadTs: string): Promise<{ date: string; account: Account } | null> => {
+    const tomorrow = daysBefore(dateInTz(new Date(), env.TIMEZONE), -1);
+    for (const day of await store.recentDays(tomorrow, 30)) {
+      for (const account of accounts) {
+        if (day.accounts[account.id]?.slack?.ts === threadTs) return { date: day.date, account };
+      }
+    }
+    return null;
+  };
+
+  /** Slack に貼られた画像を読み込む（Slack アプリに files:read の権限が必要） */
+  const downloadImages = async (files: SlackFile[]): Promise<ReviewInput["screenshots"]> => {
+    const out: ReviewInput["screenshots"] = [];
+    for (const f of files) {
+      const mediaType = IMAGE_TYPES.find((t) => t === f.mimetype);
+      const url = f.url_private_download ?? f.url_private;
+      if (!mediaType || !url) continue;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${slack.botToken}` } });
+      if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) {
+        throw new Error("画像を読み込めませんでした。Slack アプリに files:read の権限を追加してください（README の「Slack アプリ」を参照）");
+      }
+      const data = Buffer.from(await res.arrayBuffer());
+      if (data.length > MAX_IMAGE_BYTES) continue;
+      out.push({ mediaType, data: data.toString("base64") });
+    }
+    return out;
+  };
+
   // ---- 続きもの：前回のコメントの結果を受け取り、その選択で次の話の企画を作る ----
   const chooseAndPlan = async (date: string, account: Account, choice: Omit<AudienceChoice, "at">): Promise<void> => {
     const state = (await store.getDay(date))?.accounts[account.id];
@@ -420,9 +495,34 @@ export function createSlackBot(opts: {
   );
 
   app.message(async ({ message, client }) => {
-    // 編集・削除などの通知や、ボット自身の投稿には反応しない
-    if (message.subtype !== undefined || message.bot_id || message.channel !== slack.channelId) return;
+    // 編集・削除などの通知や、ボット自身の投稿には反応しない（画像つきの書き込みは受け取る）
+    if (message.subtype !== undefined && message.subtype !== "file_share") return;
+    if ((message as { bot_id?: string }).bot_id || message.channel !== slack.channelId) return;
     const text = message.text ?? "";
+
+    // 動画のスレッドに画像（分析画面のスクリーンショット）が貼られたら、その数字でレビューする
+    const files = ((message as { files?: SlackFile[] }).files ?? []).filter((f) => f.mimetype?.startsWith("image/"));
+    const threadTs = (message as { thread_ts?: string }).thread_ts;
+    if (files.length > 0) {
+      const owner = threadTs ? await findThreadOwner(threadTs) : null;
+      if (!owner) {
+        await client.chat.postMessage({
+          channel: message.channel,
+          thread_ts: message.ts,
+          text: "どの動画の数字か分からないので、その動画の企画のメッセージのスレッドに貼り直してください",
+        });
+        return;
+      }
+      background(
+        "レビュー",
+        downloadImages(files)
+          .then((shots) => critique(owner.date, owner.account, shots, text))
+          .catch(async (e) => {
+            await client.chat.postMessage({ channel: message.channel, thread_ts: threadTs, text: `⚠️ ${e instanceof Error ? e.message : String(e)}` });
+          }),
+      );
+      return;
+    }
 
     if (text.trim() === "企画作成") {
       background("企画作成", opts.onRunRequested());

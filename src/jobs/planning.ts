@@ -3,6 +3,7 @@ import { isPlanningDay, type Account } from "../config/accounts.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { runPlanner } from "../planning/plannerAgent.js";
 import { runResearch } from "../research/researchAgent.js";
+import { lessonsText } from "../review/lessons.js";
 import { loadEpisodes, pendingEpisode, seriesBrief } from "../series/series.js";
 import type { Store } from "../store/store.js";
 import { mapWithLimit } from "../util/concurrency.js";
@@ -78,6 +79,7 @@ export async function planAccount(
       research,
       history: await store.recentDays(date, HISTORY_DAYS),
       seriesBrief: brief,
+      lessons: lessonsText(await store.getLessons(account.id), ["plan"]),
       revision:
         revision !== undefined && before.proposals
           ? { instruction: revision, previous: before.proposals }

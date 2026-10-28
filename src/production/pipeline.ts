@@ -12,6 +12,7 @@ import { JobRenderer, type RenderSettings } from "./renderer.js";
 import { factsToCheck, runScriptAgent, type VideoScript } from "./scriptAgent.js";
 import { runVideoAgent, verifyJobCode, type VideoAgentResult } from "./videoAgent.js";
 import { narrate, type VoicevoxClient } from "./voicevox.js";
+import { lessonsText } from "../review/lessons.js";
 import { loadEpisodes, seriesBrief } from "../series/series.js";
 
 const PROJECT = process.cwd();
@@ -147,6 +148,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         account,
         proposal,
         seriesBrief: account.series ? seriesBrief(account, await loadEpisodes(store, account, date)) : undefined,
+        lessons: lessonsText(await store.getLessons(account.id), ["script", "post"]),
         revision: revision && prev.script ? { instruction: revision.instruction, previous: prev.script } : undefined,
       });
     }
@@ -247,6 +249,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         job,
         jobDir,
         renderer,
+        lessons: lessonsText(await store.getLessons(account.id), ["visual"]),
         revision:
           revision?.instruction ??
           (prev.retryOf && carried ? "前回は途中で止まりました。今のコードを確認してエラーや見た目の問題を直し、仕上げてください。" : undefined),

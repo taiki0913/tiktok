@@ -14,7 +14,8 @@ oauth_config:
       - chat:write          # 企画の投稿・更新
       - channels:history    # 参考動画URLや「企画作成」の書き込みを読む（公開チャンネル）
       - groups:history      # 同上（プライベートチャンネル）
-      - files:write         # 次のフェーズで完成動画のプレビューを送るため
+      - files:write         # 完成した動画をスレッドに送る
+      - files:read          # スレッドに貼られた分析画面のスクリーンショットを読む（レビュー）
 settings:
   event_subscriptions:
     bot_events:

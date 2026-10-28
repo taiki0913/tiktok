@@ -3,7 +3,7 @@
 //   data/references.json      … Slack に貼られた参考動画
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AccountDayState, DayState, ReferenceVideo } from "../domain.js";
+import type { AccountDayState, DayState, Lesson, ReferenceVideo } from "../domain.js";
 import { Mutex } from "../util/concurrency.js";
 
 async function readJson<T>(path: string): Promise<T | undefined> {
@@ -21,14 +21,19 @@ async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
   await rename(tmp, path);
 }
 
+/** アカウントごとに覚えておく学びの数（多すぎると指示がぼやけるので、新しいものだけ残す） */
+const MAX_LESSONS = 12;
+
 export class Store {
   private readonly mutex = new Mutex();
   private readonly daysDir: string;
   private readonly referencesPath: string;
+  private readonly lessonsPath: string;
 
   constructor(dataDir: string) {
     this.daysDir = join(dataDir, "days");
     this.referencesPath = join(dataDir, "references.json");
+    this.lessonsPath = join(dataDir, "lessons.json");
   }
 
   private dayPath(date: string): string {
@@ -85,6 +90,22 @@ export class Store {
       .slice(0, n);
     const days = await Promise.all(dates.map((d) => this.getDay(d)));
     return days.filter((d): d is DayState => d !== undefined);
+  }
+
+  /** レビューで得た学び（アカウントごと、新しい順に MAX_LESSONS 件まで） */
+  async getLessons(accountId: string): Promise<Lesson[]> {
+    return (await readJson<Record<string, Lesson[]>>(this.lessonsPath))?.[accountId] ?? [];
+  }
+
+  addLessons(accountId: string, lessons: Lesson[]): Promise<void> {
+    return this.mutex.run(async () => {
+      const all = (await readJson<Record<string, Lesson[]>>(this.lessonsPath)) ?? {};
+      const known = new Set((all[accountId] ?? []).map((l) => l.text));
+      const fresh = lessons.filter((l) => !known.has(l.text));
+      all[accountId] = [...fresh, ...(all[accountId] ?? [])].slice(0, MAX_LESSONS);
+      await mkdir(join(this.lessonsPath, ".."), { recursive: true });
+      await writeJsonAtomic(this.lessonsPath, all);
+    });
   }
 
   async listReferences(): Promise<ReferenceVideo[]> {
