@@ -90,7 +90,10 @@ async function scriptText(state: AccountDayState): Promise<string> {
   if (job) {
     lines.push(`動画の長さ：${(job.durationInFrames / job.fps).toFixed(1)}秒`);
     for (const s of job.scenes) {
-      lines.push(`${(s.from / job.fps).toFixed(1)}〜${((s.from + s.durationInFrames) / job.fps).toFixed(1)}秒　字幕「${s.caption}」　読み上げ「${s.narration}」${s.mood ? `　雰囲気 ${s.mood}` : ""}`);
+      const photo = job.photos?.find((ph) => ph.sceneIndex === s.index);
+      lines.push(
+        `${(s.from / job.fps).toFixed(1)}〜${((s.from + s.durationInFrames) / job.fps).toFixed(1)}秒　字幕「${s.caption}」　読み上げ「${s.narration}」${s.mood ? `　雰囲気 ${s.mood}` : ""}${photo ? `　本物の写真「${photo.caption}」` : ""}`,
+      );
     }
     lines.push(`締めの画面：${job.endCard.question}`);
   } else if (p?.script) {

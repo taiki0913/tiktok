@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PhotoAsset } from "./production/photos.js";
 import type { VideoScript } from "./production/scriptAgent.js";
 
 /** 競合調査エージェントが企画エージェントに渡す「結果だけ」のまとめ */
@@ -91,6 +92,8 @@ export interface ProductionState {
   durationSec?: number;
   /** 台本エージェントが「自信なし」とした事実 */
   factsToCheck?: { claim: string; basis: string }[];
+  /** 動画に使った本物の写真と出典（Slack で確認し、投稿文に出典を入れる） */
+  photos?: PhotoAsset[];
   /** ナレーションのクレジット（例：VOICEVOX:九州そら）。投稿文に入れる。null はナレーションなし */
   voiceCredit?: string | null;
   /** ナレーションを無音で代用したときなどの注意 */

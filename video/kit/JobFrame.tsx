@@ -95,6 +95,7 @@ export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = (
     ...job.scenes.map((s) => s.caption + s.onScreen.join("")),
     job.endCard.question,
     job.hook ?? "",
+    ...(job.photos ?? []).map((p) => `実際の写真｜${p.caption}${p.credit}`),
     job.endCard.sources.join(""),
     job.credits.join(""),
     "コメントで教えてください出典：0123456789,.%年月日万億人",

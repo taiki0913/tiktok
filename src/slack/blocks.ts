@@ -200,6 +200,15 @@ export function reviewBlocks(date: string, account: Account, p: ProductionState)
       ),
     );
   }
+  if (p.photos && p.photos.length > 0) {
+    blocks.push(
+      mrkdwn(
+        `🖼 *使った本物の写真*（別人・別の時代の写真になっていないか、元のページで確かめてください）\n${p.photos
+          .map((f) => `• 場面${f.sceneIndex + 1}：${f.caption}（${f.license}）<${f.sourceUrl}|元のページ>`)
+          .join("\n")}`,
+      ),
+    );
+  }
   const notes = [...p.warnings, ...(p.costUsd != null ? [`映像づくりの費用の目安：約$${p.costUsd.toFixed(2)}`] : [])];
   if (notes.length > 0) blocks.push(context(notes.join("　/　")));
   blocks.push({

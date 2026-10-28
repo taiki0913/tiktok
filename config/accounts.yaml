@@ -39,7 +39,10 @@ accounts:
     visual: >-
       ポリゴン調の昔の日本（江戸の町並み・長屋・城・街道・古墳など）。夕暮れの暖色（橙・朱・土色）を基調にし、
       夜の場面は藍色。人物は顔のない単純な立体で、着物は色で表す。字幕の強調色は朱色。
+      幕末・明治以降の話では、本物の古写真（job.photos）があれば ArchivePhoto で見せ、CGの再現と切り替える。
     accent: "#ff6a3d"
+    # 史実の場面で、本物の古写真（パブリックドメインなど自由に使えるもの）を Wikimedia Commons から探して使う
+    archivePhotos: true
     voice: { speaker: 青山龍星, style: ノーマル, speed: 1.1 }
     postTime: "19:00"
     # 毎日作る（schedule を省略すると毎日）

@@ -9,6 +9,7 @@ import { Mutex } from "../util/concurrency.js";
 import { computeBgmCues, computeTimeline, DEFAULT_TIMELINE, type BgmCue, type JobData } from "../../video/kit/job.js";
 import { writeJobFiles } from "./jobFiles.js";
 import { JobRenderer, type RenderSettings } from "./renderer.js";
+import { findPhotos, type PhotoAsset } from "./photos.js";
 import { factsToCheck, runScriptAgent, type VideoScript } from "./scriptAgent.js";
 import { runVideoAgent, verifyJobCode, type VideoAgentResult } from "./videoAgent.js";
 import { narrate, type VoicevoxClient } from "./voicevox.js";
@@ -89,6 +90,7 @@ export async function markQueued(store: Store, date: string, accountId: string, 
       revisions: [...(prev?.revisions ?? []), ...(revision ? [{ ...revision, at: new Date().toISOString() }] : [])],
       script: prev?.script,
       jobId: prev?.jobId,
+      ...(prev?.photos ? { photos: prev.photos } : {}),
       ...(retryOf ? { retryOf } : {}),
     };
   });
@@ -167,6 +169,30 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       { client: deps.voicevox, publicDir, relDir: "" },
     );
     const warnings = narration.warning ? [narration.warning] : [];
+    // 映像だけの作り直しと、失敗した回のやり直しは、前回のジョブ（写真・映像のコード）を引き継ぐ
+    const fromJob = prev.retryOf ?? prev.jobId;
+
+    // 本物の写真（使うアカウントだけ）。見つからなくても CG だけで作る
+    let photos: PhotoAsset[] = [];
+    if (account.archivePhotos) {
+      if (carryCode && prev.photos && fromJob && fromJob !== jobId) {
+        await cp(join(JOBS_DIR, fromJob, "public", "photos"), join(publicDir, "photos"), { recursive: true }).catch(() => {});
+        photos = prev.photos;
+      } else if ((script.photoNeeds ?? []).length > 0) {
+        try {
+          photos = await findPhotos(script.photoNeeds, script.scenes.length, { publicDir });
+        } catch (e) {
+          console.warn(`[produce:${account.id}] 写真を探せませんでした`, e);
+        }
+        if (photos.length < script.photoNeeds.length) {
+          warnings.push(`本物の写真は${script.photoNeeds.length}枚中${photos.length}枚見つかりました（見つからなかった場面はCGで作ります）`);
+        }
+      }
+    }
+    await setState((p) => {
+      if (photos.length > 0) p.photos = photos;
+      else delete p.photos;
+    });
     // 3. ジョブ（設計図）を書き出す
     // 尺の下限が60秒未満のアカウントは、場面の間を広げて60秒に引きのばさない
     const timeline = computeTimeline(narration.clips.map((c) => c.durationSec), {
@@ -215,7 +241,11 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         audio: narration.clips[i]!.file,
         ...(s.mood ? { mood: s.mood } : {}),
       })),
-      endCard: { from: timeline.endCardFrom, question: script.endQuestion, sources: script.sources },
+      endCard: {
+        from: timeline.endCardFrom,
+        question: script.endQuestion,
+        sources: photos.length > 0 ? [...script.sources, "写真：Wikimedia Commons"] : script.sources,
+      },
       bgm,
       ...(bgmCues ? { bgmCues } : {}),
       // ナレーションのクレジットは動画には入れず、投稿文に入れる
@@ -223,10 +253,11 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       accent: account.accent,
       visual: account.visual,
       ...(script.hookText ? { hook: script.hookText } : {}),
+      ...(photos.length > 0
+        ? { photos: photos.map(({ src, width, height, caption, credit, sceneIndex }) => ({ src, width, height, caption, credit, sceneIndex })) }
+        : {}),
     };
     await writeJobFiles(jobDir, job);
-    // 映像だけの作り直しと、失敗した回のやり直しは、前回のコードを引き継ぐ
-    const fromJob = prev.retryOf ?? prev.jobId;
     let carried = false;
     if (carryCode && fromJob && fromJob !== jobId) {
       const prevDir = join(JOBS_DIR, fromJob);

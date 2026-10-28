@@ -1,6 +1,7 @@
-// TikTok に投稿するときの説明文（投稿文＋ハッシュタグ＋ナレーションのクレジット）。
+// TikTok に投稿するときの説明文（投稿文＋ハッシュタグ＋ナレーションと写真のクレジット）。
 import type { Account } from "../config/accounts.js";
 import type { ProductionState, Proposal } from "../domain.js";
+import { photoCreditsText } from "./photos.js";
 
 /** 説明文・ハッシュタグ・クレジットを、そのまま貼り付けられる1つの文章にする（TikTok の上限は2200文字） */
 export function formatPostText(caption: string, hashtags: string[], credit?: string | null): string {
@@ -22,5 +23,6 @@ export function postTextFor(account: Account, proposal: Proposal, p?: Production
   const script = p?.script;
   const caption = script?.postCaption || proposal.caption;
   const hashtags = script?.hashtags?.length ? script.hashtags : proposal.hashtags;
-  return formatPostText(caption, hashtags, voiceCreditFor(account, p));
+  const credits = [voiceCreditFor(account, p), photoCreditsText(p?.photos)].filter(Boolean).join("\n\n");
+  return formatPostText(caption, hashtags, credits || null);
 }

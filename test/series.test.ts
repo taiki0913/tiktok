@@ -18,6 +18,7 @@ const script = (n: number, a: string, b: string) =>
   ({
     title: `第${n}話　テスト`,
     hookText: "酸素は残り[72時間]",
+    photoNeeds: [],
     scenes: [{ narration: "n", caption: "c", visual: "v", onScreen: [], mood: "tension" }],
     endQuestion: `A：${a}　B：${b}　コメントで決めて`,
     sources: [],

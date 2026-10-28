@@ -115,6 +115,14 @@ function jobPrompt(account: Account, job: JobData, jobRel: string, revision?: st
     `# アカウント\n${account.name}（${PRODUCTION_LABELS[account.production]}）\n見た目の方針: ${job.visual || "特になし"}\n強調色: ${job.accent}`,
     `# 動画\n${job.title}（全${job.durationInFrames}フレーム、${fps}fps）`,
     job.hook ? `# つかみの文字\n「${job.hook}」を、外枠が0〜${HOOK_FRAMES}フレームの間、画面上部（y 230〜560）に大きく出す。この文字を目で裏付ける主役を、0フレーム目から画面中央に大きく明るく映す。` : "",
+    job.photos?.length
+      ? `# 本物の写真\n${job.photos
+          .map(
+            (p, i) =>
+              `- job.photos[${i}]：「${p.caption}」（${p.width}×${p.height}・${p.width >= p.height ? "横長" : "縦長"}）→ 場面${p.sceneIndex + 1}で ArchivePhoto を使って出す`,
+          )
+          .join("\n")}\nrender_frames でその場面を見て、写真が正しく出ているか（顔が切れていないかなど）確かめる。`
+      : "",
     `# 場面\n${scenes}\n締めの画面: フレーム ${job.endCard.from}〜（外枠が出すので作らない）`,
     revision
       ? `# 作り直しの指示\n「${revision}」\n前回の Video.tsx が同じフォルダにあります。read_file で読み、指示に合わせて直してください。`

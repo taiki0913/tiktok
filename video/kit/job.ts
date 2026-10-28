@@ -70,6 +70,20 @@ export function computeBgmCues(
   });
 }
 
+/** 本物の写真（パブリックドメインなど、自由に使えるもの）。ArchivePhoto で出す */
+export interface JobPhoto {
+  /** public/ からの相対パス */
+  src: string;
+  width: number;
+  height: number;
+  /** 何の写真か（画面に出す短い説明） */
+  caption: string;
+  /** 画面に小さく出す出典（例：写真：Wikimedia Commons（パブリックドメイン）） */
+  credit: string;
+  /** この写真を使う場面（scenes の index） */
+  sceneIndex: number;
+}
+
 export interface JobData {
   id: string;
   accountId: string;
@@ -93,6 +107,8 @@ export interface JobData {
   visual: string;
   /** 0フレーム目から画面上部に大きく出す、つかみの文字（[ ] で強調） */
   hook?: string;
+  /** 本物の写真（見つかったときだけ） */
+  photos?: JobPhoto[];
 }
 
 /** つかみの文字を出しておく長さ（フレーム） */

@@ -65,6 +65,8 @@ const AccountSchema = z.object({
       choiceRule: z.string(),
     })
     .optional(),
+  /** true にすると、史実の場面で本物の写真（パブリックドメインなど、自由に使えるもの）を探して使う */
+  archivePhotos: z.boolean().default(false),
   /** false にすると、企画も動画も作らない（休止） */
   active: z.boolean().default(true),
   /** 企画を作る日。every 日に1回、group の組の日に作る（every: 2 なら group 0 と 1 が交互） */

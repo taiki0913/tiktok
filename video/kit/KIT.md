@@ -16,6 +16,7 @@
 - `job.accent`：強調色（字幕と同じ色。数字やラベルの強調に使う）
 - `job.visual`：アカウントの見た目の方針。**必ずこれに合わせる**
 - `job.fps` は 30、画面は 1080×1920（縦長）
+- `job.photos`（ないこともある）：本物の写真。`sceneIndex` の場面で `ArchivePhoto` を使って出す
 
 ## 画面の配置（TikTok の表示に隠れない範囲）
 - 上端 y < 140：TikTok の上部の表示に隠れる。重要なものを置かない（y=108 に外枠のクレジットが出る）
@@ -27,7 +28,7 @@
 ## 必ず守ること
 1. **アニメーションは `useCurrentFrame()` のフレーム番号だけで決める。** `Math.random()`・`Date`・`setTimeout`・`useFrame`（react-three-fiber）は使わない。乱数は remotion の `random("シード文字列")` を使う（毎回同じ値になる）。
 2. **HTMLの文字や板は必ず重ね合わせの層に置く。** 3D（ThreeCanvas）の後に置く要素は `<AbsoluteFill>`（remotion）で包むか、`position: "absolute"` を付ける。そうしないと画面の外に押し出されて映らない。`Panel`・`BigNumber`・`Tag`・`Callout`・グラフは x, y を渡せば自動で absolute になる（`Chip` だけは包む必要がある）。
-3. 外部のURL・画像・フォント・ネットワークは使わない。形はすべて部品か three.js の基本形状で作る。
+3. 外部のURL・画像・フォント・ネットワークは使わない。形はすべて部品か three.js の基本形状で作る。画像は `job.photos` の本物の写真だけを、`ArchivePhoto` で出す。
 4. 文字は `FONT_FAMILY`（Noto Sans JP）で、太さは 700 か 900 だけを使う。
 5. 画面に出す数字・事実は `job.scenes[].onScreen` と `narration` にあるものだけ。新しい数字を作らない。
 6. ポリゴン調のアカウントでは、CGで再現した映像であることを `Tag`（例：「CGによる再現」「想像図」）で示す。
@@ -89,6 +90,9 @@
 | `VerticalGauge` | x, y, height, value, marks, toRatio | 縦の目盛り（深度計・年表・高さ比べ） |
 | `BarChart` | x, y, width, height, items, max?, unit?, progress?, title?, source? | 棒グラフ（progress で伸びる） |
 | `LineChart` | x, y, width, height, series, xMin, xMax, yMin, yMax, xTicks?, yTicks?, progress?, title?, source? | 折れ線グラフ |
+| `ArchivePhoto` | photo, durationInFrames, label?, accent?, zoom?: "in"/"out"/"none", focus?, centerY?, maxWidth?, maxHeight?, tilt? | 本物の写真（`job.photos[i]`）を古い紙焼きのように画面いっぱいに出す（背景は同じ写真をぼかしたもの）。上に「実際の写真｜説明」、下に出典が自動で入る。`<Sequence from={場面.from} durationInFrames={場面.durationInFrames}>` の中に置く。focus は寄る中心（顔の位置など、0〜1） |
+
+**本物の写真の使い方**（`job.photos` があるとき）：その場面は 3D を止めて `ArchivePhoto` に切り替える（ハードカット）。写真の上に CG や文字を重ねて中身を書き換えない。CG を写真のように見せない（CG の場面には「CGによる再現」の札を付ける）。オチや答えの場面の写真は、直前の CG の場面と同じ構図・同じものから切り替えると「本物だった」と伝わる。0〜2.6秒（つかみの文字が出ている間）に写真を出すときは `centerY={920} maxHeight={560}` にして、つかみの文字と重ねない。
 
 ### 便利な関数
 - `countUp(frame, from, to, startFrame, durationFrames)`：数が増えていく（減速つき）

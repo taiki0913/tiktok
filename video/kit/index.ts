@@ -1,4 +1,5 @@
 // 動画づくりの部品集。動画作成エージェントはここから import して使う。
+export * from "./ArchivePhoto";
 export * from "./Caption";
 export * from "./charts";
 export * from "./fonts";
