@@ -91,7 +91,12 @@ export interface JobData {
   accent: string;
   /** 見た目の方針（アカウント設定の visual） */
   visual: string;
+  /** 0フレーム目から画面上部に大きく出す、つかみの文字（[ ] で強調） */
+  hook?: string;
 }
+
+/** つかみの文字を出しておく長さ（フレーム） */
+export const HOOK_FRAMES = 78;
 
 export interface TimelineOptions {
   fps: number;

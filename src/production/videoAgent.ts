@@ -10,7 +10,7 @@ import { z } from "zod";
 import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
 import { env } from "../config/env.js";
 import { assertUsableStop, estimateCostUsd, FALLBACK_BETA, getClient } from "../llm/claude.js";
-import type { JobData } from "../../video/kit/job.js";
+import { HOOK_FRAMES, type JobData } from "../../video/kit/job.js";
 import type { JobRenderer } from "./renderer.js";
 
 const execFileAsync = promisify(execFile);
@@ -114,6 +114,7 @@ function jobPrompt(account: Account, job: JobData, jobRel: string, revision?: st
   return [
     `# アカウント\n${account.name}（${PRODUCTION_LABELS[account.production]}）\n見た目の方針: ${job.visual || "特になし"}\n強調色: ${job.accent}`,
     `# 動画\n${job.title}（全${job.durationInFrames}フレーム、${fps}fps）`,
+    job.hook ? `# つかみの文字\n「${job.hook}」を、外枠が0〜${HOOK_FRAMES}フレームの間、画面上部（y 230〜560）に大きく出す。この文字を目で裏付ける主役を、0フレーム目から画面中央に大きく明るく映す。` : "",
     `# 場面\n${scenes}\n締めの画面: フレーム ${job.endCard.from}〜（外枠が出すので作らない）`,
     revision
       ? `# 作り直しの指示\n「${revision}」\n前回の Video.tsx が同じフォルダにあります。read_file で読み、指示に合わせて直してください。`

@@ -4,7 +4,7 @@ import React from "react";
 import { AbsoluteFill, Html5Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { Caption, splitHighlights } from "./Caption";
 import { FONT_FAMILY, useFontsReady } from "./fonts";
-import { BGM_CROSSFADE_FRAMES, type JobData } from "./job";
+import { BGM_CROSSFADE_FRAMES, HOOK_FRAMES, type JobData } from "./job";
 
 const BGM_VOLUME = 0.12;
 
@@ -50,10 +50,51 @@ export const EndCard: React.FC<{ question: string; sources: string[]; credits: s
   );
 };
 
+/** 0フレーム目から画面上部に出す、つかみの文字（フェードインしない。最後だけ消える） */
+const HookTitle: React.FC<{ text: string; accent: string }> = ({ text, accent }) => {
+  const frame = useCurrentFrame();
+  if (frame >= HOOK_FRAMES) return null;
+  const opacity = interpolate(frame, [HOOK_FRAMES - 10, HOOK_FRAMES], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 230,
+        left: 0,
+        right: 0,
+        padding: "28px 70px 34px",
+        opacity,
+        background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.62) 18%, rgba(0,0,0,0.62) 82%, rgba(0,0,0,0) 100%)",
+      }}
+    >
+      <div
+        lang="ja"
+        style={{
+          wordBreak: "auto-phrase" as React.CSSProperties["wordBreak"],
+          fontFamily: FONT_FAMILY,
+          fontWeight: 900,
+          fontSize: 96,
+          lineHeight: 1.25,
+          color: "#ffffff",
+          textAlign: "center",
+          textShadow: "0 0 3px #000, 0 6px 18px rgba(0,0,0,0.9)",
+        }}
+      >
+        {splitHighlights(text).map((p, i) => (
+          <span key={i} style={p.strong ? { color: accent } : undefined}>
+            {p.text}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = ({ job, children }) => {
   useFontsReady([
     ...job.scenes.map((s) => s.caption + s.onScreen.join("")),
     job.endCard.question,
+    job.hook ?? "",
     job.endCard.sources.join(""),
     job.credits.join(""),
     "コメントで教えてください出典：0123456789,.%年月日万億人",
@@ -69,6 +110,7 @@ export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = (
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {children}
+      {job.hook && <HookTitle text={job.hook} accent={job.accent} />}
       <Caption
         items={job.scenes.map((s) => ({ from: s.from, to: s.from + s.durationInFrames, text: s.caption }))}
         accent={job.accent}

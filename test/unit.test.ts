@@ -48,7 +48,7 @@ test("accounts.yaml: 6アカウントがすべて読み込める", () => {
     accounts.map((a) => a.production).sort(),
     ["manga", "motion_graphics", "polygon", "polygon", "polygon", "polygon"],
   );
-  for (const a of accounts) assert.ok(a.lengthSec[0] >= 60, `${a.id} は60秒以上`);
+  for (const a of accounts) assert.ok(a.lengthSec[0] >= 30 && a.lengthSec[0] < a.lengthSec[1], `${a.id} の尺`);
 });
 
 test("企画を作る日：毎日のアカウントと2日に1回のアカウントがあり、休止中のアカウントは作らない", () => {

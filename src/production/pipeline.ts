@@ -168,7 +168,11 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     );
     const warnings = narration.warning ? [narration.warning] : [];
     // 3. ジョブ（設計図）を書き出す
-    const timeline = computeTimeline(narration.clips.map((c) => c.durationSec), DEFAULT_TIMELINE);
+    // 尺の下限が60秒未満のアカウントは、場面の間を広げて60秒に引きのばさない
+    const timeline = computeTimeline(narration.clips.map((c) => c.durationSec), {
+      ...DEFAULT_TIMELINE,
+      minTotalSec: account.lengthSec[0] >= 60 ? DEFAULT_TIMELINE.minTotalSec : 0,
+    });
 
     // BGM：雰囲気ごとの曲があれば場面ごとに切り替え、なければアカウントの曲を1曲通しで流す
     let bgm: string | null = null;
@@ -218,6 +222,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       credits: [],
       accent: account.accent,
       visual: account.visual,
+      ...(script.hookText ? { hook: script.hookText } : {}),
     };
     await writeJobFiles(jobDir, job);
     // 映像だけの作り直しと、失敗した回のやり直しは、前回のコードを引き継ぐ

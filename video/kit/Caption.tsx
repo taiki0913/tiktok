@@ -25,7 +25,8 @@ export const Caption: React.FC<{ items: CaptionItem[]; accent: string; top: numb
   const frame = useCurrentFrame();
   const item = items.find((c) => frame >= c.from && frame < c.to);
   if (!item) return null;
-  const local = frame - item.from;
+  // 動画の最初の字幕は、0フレーム目から出しておく（冒頭で文字がない時間をつくらない）
+  const local = item.from <= 0 ? 99 : frame - item.from;
   const opacity = interpolate(local, [0, 6], [0, 1], { extrapolateRight: "clamp" });
   const lift = interpolate(local, [0, 8], [24, 0], { extrapolateRight: "clamp" });
 
