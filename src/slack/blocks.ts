@@ -1,7 +1,7 @@
 // Slack に表示するメッセージ（Block Kit）の組み立て。副作用のない関数だけを置く。
 import type { types as Slack } from "@slack/bolt";
 import { z } from "zod";
-import { PRODUCTION_LABELS, type Account } from "../config/accounts.js";
+import { displayName, PRODUCTION_LABELS, type Account } from "../config/accounts.js";
 import { env } from "../config/env.js";
 import type { AccountDayState, DayState, Lesson, PostState, ProductionState, Proposal, SavedState } from "../domain.js";
 import { isPostLocked } from "../posting/publisher.js";
@@ -296,7 +296,7 @@ export function videoReviseModal(date: string, account: Account): Slack.View {
     submit: { type: "plain_text", text: "作り直す" },
     close: { type: "plain_text", text: "キャンセル" },
     blocks: [
-      mrkdwn(`*${account.name}* の動画を作り直します。`),
+      mrkdwn(`*${displayName(account)}* の動画を作り直します。`),
       {
         type: "input",
         block_id: "mode",
@@ -336,7 +336,7 @@ export function accountBlocks(
   const blocks: Slack.KnownBlock[] = [
     {
       type: "header",
-      text: { type: "plain_text", text: truncate(`${accountIndex + 1}. ${account.name}`, 150), emoji: true },
+      text: { type: "plain_text", text: truncate(`${accountIndex + 1}. ${displayName(account)}`, 150), emoji: true },
     },
     context(`${PRODUCTION_LABELS[account.production]} ・ 投稿予定 ${account.postTime} ・ ${formatJpDate(date)}`),
   ];
@@ -441,7 +441,7 @@ export function accountFallbackText(account: Account, state: AccountDayState): s
     skipped: "今日はスキップ",
     error: "企画の作成に失敗しました",
   };
-  return `${account.name}：${status[state.status]}`;
+  return `${displayName(account)}：${status[state.status]}`;
 }
 
 export function countDecided(day: DayState, accounts: Account[]): { decided: number; total: number } {
@@ -459,19 +459,19 @@ export function summaryBlocks(day: DayState, accounts: Account[]): Slack.KnownBl
       const s = day.accounts[a.id]!;
       switch (s.status) {
         case "planning":
-          return `⏳ ${a.name}：作成中…`;
+          return `⏳ ${displayName(a)}：作成中…`;
         case "awaiting_choice":
-          return `💬 ${a.name}：前回のコメントの結果待ち`;
+          return `💬 ${displayName(a)}：前回のコメントの結果待ち`;
         case "awaiting_approval":
-          return `🟡 ${a.name}：承認待ち`;
+          return `🟡 ${displayName(a)}：承認待ち`;
         case "approved": {
           const i = s.selectedIndex ?? 0;
-          return `✅ ${a.name}：案${proposalLetter(i)}「${s.proposals?.[i]?.title ?? ""}」${productionShort(s.production)}`;
+          return `✅ ${displayName(a)}：案${proposalLetter(i)}「${s.proposals?.[i]?.title ?? ""}」${productionShort(s.production)}`;
         }
         case "skipped":
-          return `⏭ ${a.name}：スキップ`;
+          return `⏭ ${displayName(a)}：スキップ`;
         case "error":
-          return `⚠️ ${a.name}：エラー`;
+          return `⚠️ ${displayName(a)}：エラー`;
       }
     });
   const { decided, total } = countDecided(day, accounts);
@@ -495,7 +495,7 @@ export function reviseModal(date: string, account: Account): Slack.View {
     submit: { type: "plain_text", text: "作り直す" },
     close: { type: "plain_text", text: "キャンセル" },
     blocks: [
-      mrkdwn(`*${account.name}* の企画を作り直します。`),
+      mrkdwn(`*${displayName(account)}* の企画を作り直します。`),
       {
         type: "input",
         block_id: "instruction",
@@ -522,7 +522,7 @@ export function seriesChoiceModal(date: string, account: Account): Slack.View {
     submit: { type: "plain_text", text: "この内容で作る" },
     close: { type: "plain_text", text: "キャンセル" },
     blocks: [
-      mrkdwn(`*${account.name}* の次の話を、コメントの内容に合わせて作ります。`),
+      mrkdwn(`*${displayName(account)}* の次の話を、コメントの内容に合わせて作ります。`),
       {
         type: "input",
         block_id: "note",
@@ -573,9 +573,10 @@ export function referencePromptBlocks(
     mrkdwn(`🔗 参考動画を受け取りました\n>${c || "（キャプションなし）"}\n>@${authorName}\nどのアカウントの参考にしますか？`),
     {
       type: "actions",
-      elements: accounts.map((a) =>
-        button(a.name, `${ACTIONS.saveReference}:${a.id}`, { a: a.id, u: url, c, n: authorName }),
-      ),
+      // 同じTikTokアカウントのもう1本（sameAs）と休止中のアカウントは、ボタンを出さない（参考動画は元のアカウントと共通）
+      elements: accounts
+        .filter((a) => !a.sameAs && a.active)
+        .map((a) => button(a.name, `${ACTIONS.saveReference}:${a.id}`, { a: a.id, u: url, c, n: authorName })),
     },
   ];
 }

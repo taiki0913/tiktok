@@ -1,5 +1,5 @@
-// 毎朝の企画づくり：競合調査 → 企画 → 保存 → 通知 を6アカウント分まわす。
-import { isPlanningDay, type Account } from "../config/accounts.js";
+// 毎朝の企画づくり：競合調査 → 企画 → 保存 → 通知 を、その日に作るアカウント分まわす。
+import { baseId, isPlanningDay, type Account } from "../config/accounts.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { runPlanner } from "../planning/plannerAgent.js";
 import { runResearch } from "../research/researchAgent.js";
@@ -60,16 +60,25 @@ export async function planAccount(
   });
   await notifier.accountUpdated(date, account, before);
 
+  // 同じTikTokアカウントのもう1本（日本史の昼と夜など）
+  const related = deps.accounts.filter((a) => baseId(a) === baseId(account));
   try {
+    const today = await store.getDay(date);
+    const siblings = related.filter((a) => a.id !== account.id).map((a) => today?.accounts[a.id]);
     let research = before.research;
     if (!research || revision === undefined) {
-      const since = daysBefore(date, REFERENCE_DAYS);
-      const refs = (await store.listReferences()).filter(
-        (r) => r.accountId === account.id && r.addedAt.slice(0, 10) >= since,
-      );
-      research = await runResearch(account, date, refs);
+      // もう1本で今日すでに調べていれば、その結果を使う（同じ調査を2回しない）
+      research = revision === undefined ? siblings.find((s) => s?.research)?.research : undefined;
+      if (!research) {
+        const since = daysBefore(date, REFERENCE_DAYS);
+        const refs = (await store.listReferences()).filter(
+          (r) => r.accountId === baseId(account) && r.addedAt.slice(0, 10) >= since,
+        );
+        research = await runResearch(account, date, refs);
+      }
+      const found = research;
       await store.updateAccount(date, account.id, (s) => {
-        s.research = research;
+        s.research = found;
       });
     }
 
@@ -78,8 +87,10 @@ export async function planAccount(
       date,
       research,
       history: await store.recentDays(date, HISTORY_DAYS),
+      relatedIds: related.map((a) => a.id),
+      sameDay: siblings.flatMap((s) => s?.proposals ?? []),
       seriesBrief: brief,
-      lessons: lessonsText(await store.getLessons(account.id), ["plan"]),
+      lessons: lessonsText(await store.getLessons(baseId(account)), ["plan"]),
       revision:
         revision !== undefined && before.proposals
           ? { instruction: revision, previous: before.proposals }
@@ -137,7 +148,17 @@ export async function runMorningPlanning(
   });
   await deps.notifier.prepareDay(day, deps.accounts);
 
-  await mapWithLimit(targets, CONCURRENCY, (a) => planAccount(deps, a, date));
+  // もう1本（sameAs）は、元のアカウントの企画ができてから作る（調査を使い回し、題材をかぶらせないため）
+  await mapWithLimit(
+    targets.filter((a) => !a.sameAs),
+    CONCURRENCY,
+    (a) => planAccount(deps, a, date),
+  );
+  await mapWithLimit(
+    targets.filter((a) => a.sameAs),
+    CONCURRENCY,
+    (a) => planAccount(deps, a, date),
+  );
 
   const done = (await deps.store.getDay(date))!;
   await deps.notifier.summaryUpdated(done, deps.accounts);

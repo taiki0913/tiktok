@@ -42,20 +42,20 @@ const state = (over: Partial<AccountDayState>): AccountDayState => ({
   ...over,
 });
 
-test("accounts.yaml: 6アカウントがすべて読み込める", () => {
-  assert.equal(accounts.length, 6);
+test("accounts.yaml: 6アカウントと、日本史の2本目（昼）が読み込める", () => {
+  assert.equal(accounts.filter((a) => !a.sameAs).length, 6);
   assert.deepEqual(
     accounts.map((a) => a.production).sort(),
-    ["manga", "motion_graphics", "polygon", "polygon", "polygon", "polygon"],
+    ["manga", "motion_graphics", "polygon", "polygon", "polygon", "polygon", "polygon"],
   );
   for (const a of accounts) assert.ok(a.lengthSec[0] >= 30 && a.lengthSec[0] < a.lengthSec[1], `${a.id} の尺`);
 });
 
 test("企画を作る日：毎日のアカウントと2日に1回のアカウントがあり、休止中のアカウントは作らない", () => {
   const on = (date: string) => accounts.filter((a) => isPlanningDay(a, date)).map((a) => a.id).sort();
-  // 日本史は毎日、宇宙と深海（group 0）と心理学（group 1）は2日に1回で交互、都市伝説・漫画・未来は休止
-  assert.deepEqual(on("2026-10-24"), ["cosmos", "history"]);
-  assert.deepEqual(on("2026-10-25"), ["history", "psychology"]);
+  // 日本史は毎日。心理学（group 1）のない日（group 0）は日本史を2本作る。宇宙と深海・都市伝説・漫画・未来は休止
+  assert.deepEqual(on("2026-11-01"), ["history", "history_2"]);
+  assert.deepEqual(on("2026-11-02"), ["history", "psychology"]);
   // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）
   assert.notDeepEqual(on("2026-10-31"), on("2026-11-01"));
   // 作る日のアカウントは、すべてコードで動画にできる作り方
@@ -163,11 +163,14 @@ test("Slack: 決定数の集計と一覧", () => {
   assert.match(text, /決定 2\/3/);
 });
 
-test("Slack: 参考動画の振り分けボタンは全アカウント分で、値が2000文字以内", () => {
+test("Slack: 参考動画の振り分けボタンは動いているアカウント分（2本目は元と共通）で、値が2000文字以内", () => {
   const blocks = referencePromptBlocks("あ".repeat(1000), "user", "https://www.tiktok.com/@u/video/1", accounts);
   const actions = blocks.find((b) => b.type === "actions");
   assert.ok(actions && actions.type === "actions");
-  assert.equal(actions.elements.length, accounts.length);
+  assert.deepEqual(
+    actions.elements.map((el) => el.type === "button" && el.action_id),
+    ["save_reference:history", "save_reference:psychology"],
+  );
   for (const el of actions.elements) {
     assert.ok(el.type === "button" && (el.value?.length ?? 0) <= 2000);
   }
@@ -177,7 +180,7 @@ test("Store: 同時に更新しても内容が失われない", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tiktok-agents-"));
   try {
     const store = new Store(dir);
-    await mapWithLimit(accounts, 6, (a) =>
+    await mapWithLimit(accounts.slice(0, 6), 6, (a) =>
       store.updateAccount("2026-10-16", a.id, (s) => {
         s.status = "awaiting_approval";
       }),
@@ -197,4 +200,38 @@ test("Store: 同時に更新しても内容が失われない", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("日本史の2本目（昼）：日本史の設定を引き継ぎ、投稿時刻・作る日・呼び名だけ変わる。学びなどは日本史と共通", async () => {
+  const { baseId, displayName } = await import("../src/config/accounts.js");
+  const { exportBaseName } = await import("../src/production/exporter.js");
+  const history = accounts.find((a) => a.id === "history")!;
+  const second = accounts.find((a) => a.id === "history_2")!;
+  assert.deepEqual(
+    [second.name, second.genre, second.visual, second.archivePhotos, second.voice, second.lengthSec],
+    [history.name, history.genre, history.visual, true, history.voice, history.lengthSec],
+  );
+  assert.deepEqual([second.postTime, second.schedule, second.active], ["12:30", { every: 2, group: 0 }, true]);
+  assert.equal(baseId(second), "history");
+  assert.equal(baseId(history), "history");
+  assert.equal(displayName(second), "知られざる日本史（昼）");
+  assert.equal(displayName(history), "知られざる日本史");
+  // 保存するファイル名は投稿時刻で分かれる
+  assert.deepEqual([exportBaseName(second), exportBaseName(history)], ["1230_知られざる日本史", "1900_知られざる日本史"]);
+});
+
+test("企画：同じアカウントのもう1本の過去の企画と、今日の企画案を見せて、題材をかぶらせない", async () => {
+  const { historySection, sameDaySection } = await import("../src/planning/plannerAgent.js");
+  const p = (title: string) => ({ title, hook: "h", summary: `${title}の話`, outline: [], lengthSec: 45, caption: "c", hashtags: [], basedOn: "b", originality: "o" });
+  const day = {
+    date: "2026-10-31",
+    accounts: {
+      history: { accountId: "history", status: "approved" as const, proposals: [p("写楽の正体")], selectedIndex: 0, revisions: [], updatedAt: "" },
+      history_2: { accountId: "history_2", status: "approved" as const, proposals: [p("将軍の朝ごはん")], selectedIndex: 0, revisions: [], updatedAt: "" },
+    },
+  };
+  const text = historySection(["history", "history_2"], [day]);
+  assert.match(text, /写楽の正体/);
+  assert.match(text, /将軍の朝ごはん/);
+  assert.match(sameDaySection([p("慶喜のカメラ")]), /慶喜のカメラ：慶喜のカメラの話[\s\S]*別の人物・時代・題材/);
 });

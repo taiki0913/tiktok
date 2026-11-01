@@ -1,6 +1,6 @@
 // 公開OKになった動画を、アカウントの投稿時刻（accounts.yaml の postTime）に投稿予約し、結果を確かめる。
 // 予約はアップロードした時点で投稿サービス側に入るので、投稿時刻に PC が止まっていても投稿される。
-import type { Account } from "../config/accounts.js";
+import { baseId, type Account } from "../config/accounts.js";
 import type { PostState } from "../domain.js";
 import type { ProductionNotifier } from "../production/pipeline.js";
 import { postTextFor } from "../production/postText.js";
@@ -93,7 +93,7 @@ export class Publisher {
       const at = decidePostTime(date, account.postTime, now, timeZone);
       p.post = { status: "scheduling", attempt, scheduledAt: (at ?? now).toISOString() };
       plan.request = {
-        profile: account.id,
+        profile: baseId(account),
         videoFile: p.videoFile,
         caption: postTextFor(account, proposal, p),
         ...(at ? { scheduledAt: at } : {}),

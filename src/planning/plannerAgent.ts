@@ -39,11 +39,12 @@ ${
 ${rules || "- 特になし"}`;
 }
 
-function historySection(accountId: string, history: DayState[]): string {
+/** 過去の企画。同じTikTokアカウントのもう1本（ids）の企画もまとめて見せる */
+export function historySection(ids: string[], history: DayState[]): string {
   const lines: string[] = [];
   const revisions: string[] = [];
-  for (const day of history) {
-    const s = day.accounts[accountId];
+  for (const day of history) for (const id of ids) {
+    const s = day.accounts[id];
     if (!s?.proposals) continue;
     const titles = s.proposals.map((p, i) => ({ title: p.title, adopted: i === s.selectedIndex }));
     const adopted = titles.filter((t) => t.adopted).map((t) => `「${t.title}」`);
@@ -72,6 +73,18 @@ export interface PlanRequest {
   seriesBrief?: string;
   /** これまでのレビューからの学び */
   lessons?: string;
+  /** 過去の企画を見るアカウントID（同じTikTokアカウントのもう1本を含む。省略時はこのアカウントだけ） */
+  relatedIds?: string[];
+  /** 同じ日に、同じTikTokアカウントのもう1本で出ている企画案（題材をかぶらせない） */
+  sameDay?: Proposal[];
+}
+
+/** 同じ日のもう1本の企画案 */
+export function sameDaySection(proposals: Proposal[]): string {
+  return `# 今日のもう1本（同じアカウントで別の時刻に投稿する）の企画案
+${proposals
+    .map((p) => `- ${p.title}：${p.summary}`)
+    .join("\n")}\nこれらとは別の人物・時代・題材にする（同じ日に似た動画が並ばないように）。`;
 }
 
 /** 続きものの企画の決まりごと（通常の「3案は方向性を変える」の代わり） */
@@ -86,7 +99,8 @@ export async function runPlanner(req: PlanRequest): Promise<Proposal[]> {
     ...(req.seriesBrief ? [req.seriesBrief] : []),
     `# 今日の日付\n${req.date}`,
     `# 競合調査の結果\n${JSON.stringify(req.research, null, 2)}`,
-    historySection(req.account.id, req.history),
+    historySection(req.relatedIds ?? [req.account.id], req.history),
+    ...(req.sameDay?.length ? [sameDaySection(req.sameDay)] : []),
     ...(req.lessons ? [req.lessons] : []),
   ];
   if (req.revision) {

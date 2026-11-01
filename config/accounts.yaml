@@ -14,11 +14,13 @@
 # active   … false にすると、企画も動画も作らない（休止）
 # schedule … 企画を作る日。every: 2 なら2日に1回で、group 0 の組と group 1 の組が1日おきに交互に作る
 #            （省略時は毎日）。group 0 は 2026-10-22 など、group 1 はその翌日
+# sameAs   … 同じTikTokアカウントでもう1本作るとき、元のアカウントのIDを書く。設定を引き継ぎ、書いた項目だけ変わる
+#            （label は Slack で名前のあとに出す呼び名。学び・BGM・参考動画は元のアカウントと共通）
 #
 # visual … 動画の見た目の方針。動画作成エージェントが毎回この方針にそろえる
 # voice  … ナレーションの声（VOICEVOX のキャラクター名・スタイル名・速さ）
 #          キャラクターごとに利用規約があるので、使う前に公式サイトで確認すること
-# BGM    … public/bgm/<アカウントID>/ に入れた音源からランダムに選ぶ
+# BGM    … public/bgm/<アカウントID>/ に入れた音源からランダムに選ぶ（sameAs のアカウントは元のアカウントのフォルダ）
 
 accounts:
   - id: history
@@ -46,6 +48,13 @@ accounts:
     voice: { speaker: 青山龍星, style: ノーマル, speed: 1.1 }
     postTime: "19:00"
     # 毎日作る（schedule を省略すると毎日）
+
+  # 日本史の2本目（昼）。心理学のない日（group 0）に作る。設定は history を引き継ぐ
+  - id: history_2
+    sameAs: history
+    label: 昼
+    postTime: "12:30"
+    schedule: { every: 2, group: 0 }
 
   - id: urban_legend
     name: 夜更けの都市伝説
@@ -115,6 +124,8 @@ accounts:
     voice: { speaker: 九州そら, style: ノーマル, speed: 1.15 }
     postTime: "20:00"
     schedule: { every: 2, group: 0 }
+    # 伸びなかったため休止（この日は日本史を2本作る）
+    active: false
 
   - id: manga_story
     name: 深夜コンビニ物語（仮）

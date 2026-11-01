@@ -76,6 +76,13 @@ const AccountSchema = z.object({
       group: z.number().int().nonnegative().default(0),
     })
     .default({ every: 1, group: 0 }),
+  /**
+   * 同じTikTokアカウントの、もう1本（別の時刻の投稿）。ここに書いたアカウントの設定を引き継ぎ、
+   * 書いた項目（postTime・schedule など）だけ変える。学び・BGM・参考動画は元のアカウントと共通
+   */
+  sameAs: z.string().optional(),
+  /** もう1本のとき、Slack で名前のあとに出す呼び名（例：昼） */
+  label: z.string().optional(),
 });
 
 export type Account = z.infer<typeof AccountSchema>;
@@ -89,17 +96,30 @@ export function isPlanningDay(account: Account, date: string): boolean {
   return dayNumber % every === group % every;
 }
 
-const AccountsFileSchema = z.object({
-  accounts: z.array(AccountSchema).min(1),
+/** 学び・BGM・参考動画をまとめるときのアカウントID（もう1本なら、元のアカウントのID） */
+export const baseId = (account: Account): string => account.sameAs ?? account.id;
+
+/** Slack などに出す名前（もう1本なら「知られざる日本史（昼）」のように呼び名を付ける） */
+export const displayName = (account: Account): string => (account.label ? `${account.name}（${account.label}）` : account.name);
+
+const RawFileSchema = z.object({
+  accounts: z.array(z.object({ id: z.string(), sameAs: z.string().optional() }).passthrough()).min(1),
 });
 
 export async function loadAccounts(path: string): Promise<Account[]> {
   const text = await readFile(path, "utf8");
-  const { accounts } = AccountsFileSchema.parse(parse(text));
+  const raw = RawFileSchema.parse(parse(text)).accounts;
   const ids = new Set<string>();
-  for (const a of accounts) {
+  for (const a of raw) {
     if (ids.has(a.id)) throw new Error(`アカウントIDが重複しています: ${a.id}`);
     ids.add(a.id);
   }
-  return accounts;
+  return raw.map((entry) => {
+    if (!entry.sameAs) return AccountSchema.parse(entry);
+    const base = raw.find((b) => b.id === entry.sameAs);
+    if (!base || base.sameAs) throw new Error(`${entry.id} の sameAs「${entry.sameAs}」が、元のアカウントのIDではありません`);
+    // 元のアカウントの設定を引き継ぎ、書いた項目だけ変える（休止や呼び名は引き継がない）
+    const { active: _active, label: _label, ...inherited } = base as Record<string, unknown>;
+    return AccountSchema.parse({ ...inherited, ...entry });
+  });
 }

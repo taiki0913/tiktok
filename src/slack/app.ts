@@ -4,7 +4,7 @@ import { createReadStream } from "node:fs";
 import { basename } from "node:path";
 import bolt from "@slack/bolt";
 import type { App as BoltApp, BlockAction, ButtonAction } from "@slack/bolt";
-import type { Account } from "../config/accounts.js";
+import { baseId, displayName, type Account } from "../config/accounts.js";
 import type { SlackEnv } from "../config/env.js";
 import type { AccountDayState, DayState } from "../domain.js";
 import { planAccount, type PlanNotifier, type PlanningDeps } from "../jobs/planning.js";
@@ -139,9 +139,9 @@ class SlackNotifier implements PlanNotifier, ProductionNotifier {
       const post = p.post;
       if (post && !post.notified && (post.status === "posted" || post.status === "failed" || post.status === "unknown")) {
         const text = {
-          posted: `🎉 ${account.name} の動画をTikTokに投稿しました${post.url ? `\n${post.url}` : ""}`,
-          failed: `⚠️ ${account.name} の動画をTikTokに投稿できませんでした。上のメッセージの「もう一度投稿する」でやり直せます`,
-          unknown: `❔ ${account.name} の動画が投稿されたか確認できませんでした。TikTokアプリで確認してください`,
+          posted: `🎉 ${displayName(account)} の動画をTikTokに投稿しました${post.url ? `\n${post.url}` : ""}`,
+          failed: `⚠️ ${displayName(account)} の動画をTikTokに投稿できませんでした。上のメッセージの「もう一度投稿する」でやり直せます`,
+          unknown: `❔ ${displayName(account)} の動画が投稿されたか確認できませんでした。TikTokアプリで確認してください`,
         }[post.status];
         await this.app.client.chat.postMessage({ ...thread, text });
         await this.store.updateAccount(date, account.id, (s) => {
@@ -158,7 +158,7 @@ class SlackNotifier implements PlanNotifier, ProductionNotifier {
         thread_ts: thread.thread_ts,
         file: createReadStream(p.videoFile),
         filename: basename(p.videoFile),
-        title: `${account.name}（${p.version}回目）`,
+        title: `${displayName(account)}（${p.version}回目）`,
       });
       const res = await this.app.client.chat.postMessage({ ...thread, text: "動画ができました", blocks: reviewBlocks(date, account, p) });
       await this.store.updateAccount(date, account.id, (s) => {
@@ -310,7 +310,7 @@ export function createSlackBot(opts: {
     const state = (await store.getDay(date))?.accounts[account.id];
     if (!state?.slack || !state.production?.jobId) return;
     const thread = { channel: state.slack.channel, thread_ts: state.slack.ts };
-    await app.client.chat.postMessage({ ...thread, text: `🔍 ${account.name} の動画をレビューしています…（1〜2分）` });
+    await app.client.chat.postMessage({ ...thread, text: `🔍 ${displayName(account)} の動画をレビューしています…（1〜2分）` });
     try {
       const review = await runReview({
         account,
@@ -318,12 +318,12 @@ export function createSlackBot(opts: {
         state,
         screenshots,
         note,
-        lessons: await store.getLessons(account.id),
+        lessons: await store.getLessons(baseId(account)),
         render: opts.production.render,
       });
       const at = new Date().toISOString();
       const added = review.lessons.map((l) => ({ ...l, from: date, at }));
-      await store.addLessons(account.id, added);
+      await store.addLessons(baseId(account), added);
       await app.client.chat.postMessage({ ...thread, text: `レビュー：${review.verdict}`, blocks: critiqueBlocks(date, review, added) });
     } catch (e) {
       console.error(`[review:${account.id}]`, e);
@@ -476,14 +476,14 @@ export function createSlackBot(opts: {
       const v = ReferenceValueSchema.parse(JSON.parse(action.value ?? "{}"));
       const account = findAccount(v.a);
       await store.addReference({
-        accountId: v.a,
+        accountId: baseId(account),
         url: v.u,
         caption: v.c,
         authorName: v.n,
         addedAt: new Date().toISOString(),
       });
       if (body.channel?.id && body.message?.ts) {
-        const text = `✅ 「${account.name}」の参考動画に登録しました`;
+        const text = `✅ 「${displayName(account)}」の参考動画に登録しました`;
         await client.chat.update({
           channel: body.channel.id,
           ts: body.message.ts,

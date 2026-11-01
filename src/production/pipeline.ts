@@ -2,7 +2,7 @@
 // 1本ずつ順番に作る（PCの負荷を抑えるため）。
 import { copyFile, cp, mkdir, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { CODE_PRODUCIBLE, type Account } from "../config/accounts.js";
+import { baseId, CODE_PRODUCIBLE, type Account } from "../config/accounts.js";
 import type { AccountDayState, ProductionState } from "../domain.js";
 import type { Store } from "../store/store.js";
 import { Mutex } from "../util/concurrency.js";
@@ -150,7 +150,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         account,
         proposal,
         seriesBrief: account.series ? seriesBrief(account, await loadEpisodes(store, account, date)) : undefined,
-        lessons: lessonsText(await store.getLessons(account.id), ["script", "post"]),
+        lessons: lessonsText(await store.getLessons(baseId(account)), ["script", "post"]),
         revision: revision && prev.script ? { instruction: revision.instruction, previous: prev.script } : undefined,
       });
     }
@@ -203,7 +203,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     // BGM：雰囲気ごとの曲があれば場面ごとに切り替え、なければアカウントの曲を1曲通しで流す
     let bgm: string | null = null;
     let bgmCues: BgmCue[] | undefined;
-    const moods = await moodTracks(account.id, jobId);
+    const moods = await moodTracks(baseId(account), jobId);
     if (Object.keys(moods).length > 0) {
       const names = Object.fromEntries(Object.entries(moods).map(([mood, src]) => [mood, `bgm-${mood}${extname(src).toLowerCase()}`]));
       bgmCues = computeBgmCues(
@@ -215,12 +215,12 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     }
     if (!bgmCues || bgmCues.length === 0) {
       bgmCues = undefined;
-      const bgmSrc = await pickBgm(account.id, jobId);
+      const bgmSrc = await pickBgm(baseId(account), jobId);
       if (bgmSrc) {
         bgm = `bgm${extname(bgmSrc).toLowerCase()}`;
         await copyFile(bgmSrc, join(publicDir, bgm));
       } else {
-        warnings.push(`BGM がありません（public/bgm/${account.id}/ に音源を入れてください）`);
+        warnings.push(`BGM がありません（public/bgm/${baseId(account)}/ に音源を入れてください）`);
       }
     }
     const job: JobData = {
@@ -285,7 +285,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
         job,
         jobDir,
         renderer,
-        lessons: lessonsText(await store.getLessons(account.id), ["visual"]),
+        lessons: lessonsText(await store.getLessons(baseId(account)), ["visual"]),
         revision:
           revision?.instruction ??
           (prev.retryOf && carried ? "前回は途中で止まりました。今のコードを確認してエラーや見た目の問題を直し、仕上げてください。" : undefined),
