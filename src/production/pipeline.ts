@@ -195,9 +195,12 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     });
     // 3. ジョブ（設計図）を書き出す
     // 尺の下限が60秒未満のアカウントは、場面の間を広げて60秒に引きのばさない
+    // 暗転してコメントを促す締めの画面は、続きもの（次の話の2択を見せる）だけ。ほかは最後の場面で終える
+    const endCard = !!account.series && !!script.endQuestion;
     const timeline = computeTimeline(narration.clips.map((c) => c.durationSec), {
       ...DEFAULT_TIMELINE,
       minTotalSec: account.lengthSec[0] >= 60 ? DEFAULT_TIMELINE.minTotalSec : 0,
+      ...(endCard ? {} : { endCardSec: 0, tailSec: 1 }),
     });
 
     // BGM：雰囲気ごとの曲があれば場面ごとに切り替え、なければアカウントの曲を1曲通しで流す
@@ -243,7 +246,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
       })),
       endCard: {
         from: timeline.endCardFrom,
-        question: script.endQuestion,
+        question: endCard ? (script.endQuestion ?? "") : "",
         sources: photos.length > 0 ? [...script.sources, "写真：Wikimedia Commons"] : script.sources,
       },
       bgm,

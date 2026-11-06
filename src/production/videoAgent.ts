@@ -123,7 +123,11 @@ function jobPrompt(account: Account, job: JobData, jobRel: string, revision?: st
           )
           .join("\n")}\nrender_frames でその場面を見て、写真が正しく出ているか（顔が切れていないかなど）確かめる。`
       : "",
-    `# 場面\n${scenes}\n締めの画面: フレーム ${job.endCard.from}〜（外枠が出すので作らない）`,
+    `# 場面\n${scenes}\n${
+      job.endCard.from < job.durationInFrames
+        ? `締めの画面: フレーム ${job.endCard.from}〜（外枠が出すので作らない）`
+        : "締めの画面はない。最後の場面が動画の終わり。最後のフレームまで作り込み、暗転・フェードアウトで終えない（TikTokは繰り返し再生されるので、最初の場面に自然につながると良い）"
+    }`,
     revision
       ? `# 作り直しの指示\n「${revision}」\n前回の Video.tsx が同じフォルダにあります。read_file で読み、指示に合わせて直してください。`
       : "",

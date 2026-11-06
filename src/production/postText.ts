@@ -23,6 +23,8 @@ export function postTextFor(account: Account, proposal: Proposal, p?: Production
   const script = p?.script;
   const caption = script?.postCaption || proposal.caption;
   const hashtags = script?.hashtags?.length ? script.hashtags : proposal.hashtags;
-  const credits = [voiceCreditFor(account, p), photoCreditsText(p?.photos)].filter(Boolean).join("\n\n");
+  // 出典は動画の締めの画面に出さなくなったので、投稿文に入れる
+  const sources = script?.sources?.length ? `出典：${script.sources.join("／")}` : null;
+  const credits = [sources, voiceCreditFor(account, p), photoCreditsText(p?.photos)].filter(Boolean).join("\n\n");
   return formatPostText(caption, hashtags, credits || null);
 }

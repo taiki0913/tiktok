@@ -95,7 +95,7 @@ async function scriptText(state: AccountDayState): Promise<string> {
         `${(s.from / job.fps).toFixed(1)}〜${((s.from + s.durationInFrames) / job.fps).toFixed(1)}秒　字幕「${s.caption}」　読み上げ「${s.narration}」${s.mood ? `　雰囲気 ${s.mood}` : ""}${photo ? `　本物の写真「${photo.caption}」` : ""}`,
       );
     }
-    lines.push(`締めの画面：${job.endCard.question}`);
+    if (job.endCard.question) lines.push(`締めの画面：${job.endCard.question}`);
   } else if (p?.script) {
     for (const s of p.script.scenes) lines.push(`字幕「${s.caption}」　読み上げ「${s.narration}」`);
   }

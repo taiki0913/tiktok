@@ -23,6 +23,15 @@ test("タイムライン：ナレーションの長さから場面の位置を�
   assert.ok(padded.durationInFrames / 30 >= 61, `${padded.durationInFrames / 30}秒`);
 });
 
+test("タイムライン：締めの画面なし（続きもの以外）は、最後の場面のあとに1秒の余韻を残して終わる", () => {
+  const withCard = computeTimeline([10, 20, 15], { ...DEFAULT_TIMELINE, minTotalSec: 0 });
+  const t = computeTimeline([10, 20, 15], { ...DEFAULT_TIMELINE, minTotalSec: 0, endCardSec: 0, tailSec: 1 });
+  assert.deepEqual(t.scenes.map((s) => s.from), [0, 320, 931]);
+  assert.equal(t.scenes[2]!.durationInFrames, withCard.scenes[2]!.durationInFrames + 30);
+  assert.equal(t.durationInFrames, t.endCardFrom, "締めの画面がない");
+  assert.equal(t.durationInFrames, withCard.durationInFrames - 120 + 30);
+});
+
 test("BGM：フォルダの音源から毎回同じ曲を選び、無ければ null", async () => {
   const dir = await mkdtemp(join(tmpdir(), "bgm-"));
   try {

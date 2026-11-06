@@ -31,6 +31,15 @@ test("投稿文：説明文のあとに、#を付けてそろえたハッシュ�
   assert.equal(formatPostText(" 深海8000mの先に魚はいない ", ["深海", "#雑学", "宇宙 の ふしぎ", "深海"]), "深海8000mの先に魚はいない\n\n#深海 #雑学 #宇宙のふしぎ");
 });
 
+test("投稿文：締めの画面に出さなくなった出典を、クレジットの前に入れる", () => {
+  const base: ProductionState = { status: "approved", version: 1, warnings: [], revisions: [] };
+  const script = { postCaption: "あなたは通説派？異説派？", hashtags: ["日本史"], sources: ["信長公記", "言経卿記"] } as VideoScript;
+  assert.equal(
+    postTextFor(history, proposal, { ...base, script, voiceCredit: "VOICEVOX:青山龍星" }),
+    "あなたは通説派？異説派？\n\n#日本史\n\n出典：信長公記／言経卿記\n\nVOICEVOX:青山龍星",
+  );
+});
+
 test("投稿文：完成した台本の投稿文を使い、なければ企画の投稿文を使う。最後にナレーションのクレジットを入れる", () => {
   const base: ProductionState = { status: "approved", version: 1, warnings: [], revisions: [] };
   const script = { postCaption: "台本の投稿文", hashtags: ["江戸", "雑学"] } as VideoScript;

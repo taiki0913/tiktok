@@ -94,6 +94,10 @@ export interface JobData {
   /** 締めの画面を含む全体の長さ */
   durationInFrames: number;
   scenes: JobScene[];
+  /**
+   * 締めの画面（続きものの2択だけ）。from は映像を作り込む最後のフレーム。
+   * 締めの画面がない動画（続きもの以外）は、from が durationInFrames と同じで、question は空
+   */
   endCard: { from: number; question: string; sources: string[] };
   /** BGM（public/ からの相対パス）。無ければ null */
   bgm: string | null;
@@ -120,8 +124,10 @@ export interface TimelineOptions {
   gapSec: number;
   /** 動画の最初の間（秒） */
   leadSec: number;
-  /** 締めの画面の長さ（秒） */
+  /** 締めの画面の長さ（秒）。0 なら締めの画面なし */
   endCardSec: number;
+  /** 最後の場面のあとに残す余韻（秒）。締めの画面がないときに、最後の一言で急に切れないようにする */
+  tailSec?: number;
   /** 動画全体の最低の長さ（秒）。足りなければ場面の間を広げる */
   minTotalSec: number;
 }
@@ -140,7 +146,8 @@ export function computeTimeline(
   opts: TimelineOptions = DEFAULT_TIMELINE,
 ): { scenes: { from: number; durationInFrames: number; audioFrom: number }[]; endCardFrom: number; durationInFrames: number } {
   const speech = narrationSec.reduce((a, b) => a + b, 0);
-  const base = opts.leadSec + speech + opts.gapSec * narrationSec.length + opts.endCardSec;
+  const tail = opts.tailSec ?? 0;
+  const base = opts.leadSec + speech + opts.gapSec * narrationSec.length + tail + opts.endCardSec;
   // 最低の長さに届かなければ、足りない分を場面の間に均等に足す
   const extraGap = base < opts.minTotalSec ? (opts.minTotalSec - base) / narrationSec.length : 0;
   const gap = opts.gapSec + extraGap;
@@ -149,7 +156,8 @@ export function computeTimeline(
   let t = 0;
   for (const [i, sec] of narrationSec.entries()) {
     const lead = i === 0 ? opts.leadSec : 0;
-    const len = Math.ceil((lead + sec + gap) * opts.fps);
+    const last = i === narrationSec.length - 1 ? tail : 0;
+    const len = Math.ceil((lead + sec + gap + last) * opts.fps);
     scenes.push({ from: t, durationInFrames: len, audioFrom: t + Math.round(lead * opts.fps) });
     t += len;
   }

@@ -133,9 +133,12 @@ export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = (
           {job.credits.join("／")}
         </div>
       )}
-      <Sequence from={job.endCard.from} durationInFrames={endFrames} name="締めの画面">
-        <EndCard question={job.endCard.question} sources={job.endCard.sources} credits={job.credits} accent={job.accent} />
-      </Sequence>
+      {/* 締めの画面は続きもの（2択）だけ。ほかの動画は最後の場面で終わる */}
+      {endFrames > 0 && job.endCard.question && (
+        <Sequence from={job.endCard.from} durationInFrames={endFrames} name="締めの画面">
+          <EndCard question={job.endCard.question} sources={job.endCard.sources} credits={job.credits} accent={job.accent} />
+        </Sequence>
+      )}
       {job.scenes
         .filter((s) => s.audio)
         .map((s) => (
