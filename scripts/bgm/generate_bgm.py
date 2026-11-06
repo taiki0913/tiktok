@@ -4,7 +4,7 @@
 作り直すとき（開発者向け）:
     python -m venv .venv && .venv/bin/pip install numpy scipy
     .venv/bin/python scripts/bgm/generate_bgm.py public/bgm               … すべての曲
-    .venv/bin/python scripts/bgm/generate_bgm.py public/bgm --moods-only  … 続きもの用の雰囲気ごとの曲だけ
+    .venv/bin/python scripts/bgm/generate_bgm.py public/bgm --moods-only  … 雰囲気ごとの曲だけ（宇宙と深海・日本史）
 ffmpeg があれば mp3 に、無ければ wav で書き出す。
 """
 
@@ -175,6 +175,37 @@ def wind(n: int, rng: np.random.Generator, lo: float, hi: float, rate: float) ->
     return noise * swell
 
 
+def taiko(rng: np.random.Generator, dur: float = 0.9, pitch: float = 95) -> np.ndarray:
+    """和太鼓：音程が下がる低い胴鳴りと、皮を打つ音"""
+    n = int(dur * SR)
+    t = t_axis(n)
+    f = pitch * 0.62 + pitch * 0.38 * np.exp(-t / 0.05)
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.32)
+    skin = lowpass(rng.uniform(-1, 1, n), 900) * np.exp(-t / 0.03)
+    return (body + 0.5 * skin) * envelope(n, 0.001, 0.05)
+
+
+def hyoshigi(rng: np.random.Generator) -> np.ndarray:
+    """拍子木：乾いた木を打ち合わせる音"""
+    n = int(0.12 * SR)
+    t = t_axis(n)
+    wood = np.sin(2 * np.pi * 1850 * t) * np.exp(-t / 0.012) + 0.6 * np.sin(2 * np.pi * 2730 * t) * np.exp(-t / 0.008)
+    click = bandpass(rng.uniform(-1, 1, n), 1500, 4500) * np.exp(-t / 0.004)
+    return wood + 0.8 * click
+
+
+def shakuhachi(freq: float, dur: float, rng: np.random.Generator) -> np.ndarray:
+    """尺八のような息の多い笛：下からすくい上げて入り、だんだん深くなるビブラート"""
+    n = int(dur * SR)
+    t = t_axis(n)
+    bend = 2 ** ((-0.8 * np.exp(-t / 0.12)) / 12)
+    vib = 1 + 0.006 * np.minimum(1, t / max(dur * 0.6, 0.1)) * np.sin(2 * np.pi * 5.2 * t)
+    ph = 2 * np.pi * np.cumsum(freq * bend * vib) / SR
+    tone = np.sin(ph) + 0.18 * np.sin(2 * ph) + 0.07 * np.sin(3 * ph)
+    breath = bandpass(rng.uniform(-1, 1, n), freq * 0.9, min(freq * 2.5, 9000)) * 0.18
+    return (tone + breath) * envelope(n, 0.18, min(0.6, dur * 0.4))
+
+
 def chord(root: int, kind: str) -> list[int]:
     shapes = {
         "maj7": [0, 4, 7, 11],
@@ -191,7 +222,7 @@ def chord(root: int, kind: str) -> list[int]:
 
 # ---------------------------------------------------------------- 仕上げ
 
-def master(buf: np.ndarray, wet: float, room: float = 0.84, tone: float = 12000) -> np.ndarray:
+def master(buf: np.ndarray, wet: float, room: float = 0.84, tone: float = 12000, fade_in: float = 1.5) -> np.ndarray:
     out = np.empty_like(buf)
     for ch in range(2):
         dry = highpass(buf[ch], 35)
@@ -202,7 +233,7 @@ def master(buf: np.ndarray, wet: float, room: float = 0.84, tone: float = 12000)
     out = np.tanh(out * 1.1) / 1.1  # ピークをやわらかく抑える
     out *= 10 ** (-1 / 20) / max(np.max(np.abs(out)), 1e-9) if np.max(np.abs(out)) > 10 ** (-1 / 20) else 1
     n = out.shape[1]
-    out *= envelope(n, 1.5, 3.0)
+    out *= envelope(n, fade_in, 3.0)
     return out
 
 
@@ -359,7 +390,7 @@ def manga(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
     return master(buf, wet=0.2)
 
 
-# ---------------------------------------------------------------- 続きもの用：場面の雰囲気ごとの曲
+# ---------------------------------------------------------------- 場面の雰囲気ごとの曲（宇宙と深海）
 
 def tension(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
     """緊迫：ぶつかり合う低い持続音、心臓の鼓動のような低音、時計のような刻み"""
@@ -455,6 +486,152 @@ def hope(seed: int, progression: list[tuple[int, str]], bpm: float, dur: float) 
     return master(buf, wet=0.3, tone=10000)
 
 
+# ---------------------------------------------------------------- 日本史用：和の音色で、場面の雰囲気ごとの曲
+
+MIYAKO = [0, 1, 5, 7, 8]  # 都節（暗く、妖しい）
+YO = [0, 2, 5, 7, 9]  # 陽音階（明るく、ひらけた）
+
+
+def wa_wonder(seed: int, root: int, dur: float) -> np.ndarray:
+    """神秘：笙のような和音が移ろい、陽音階の琴と鈴がまばらに鳴る"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    seg = 6.0
+    t = 0.0
+    shapes = [[0, 7, 14], [-2, 5, 12], [0, 5, 9], [-5, 2, 9]]
+    i = 0
+    while t < dur:
+        place(buf, pad([midi_hz(root + 12 + m) for m in shapes[i % len(shapes)]], seg + 2, 1600, 1.5, 2, rng), t, 0.26)
+        t += seg
+        i += 1
+    notes = [root + 24 + 12 * o + s for o in (0, 1) for s in YO]
+    t = 0.3
+    while t < dur - 3:
+        m = notes[rng.integers(0, len(notes))]
+        place(buf, pluck(midi_hz(m), 3.0, rng, 0.997, 4500), t, rng.uniform(0.3, 0.45), rng.uniform(-0.5, 0.5))
+        if rng.random() < 0.3:
+            place(buf, fm_bell(midi_hz(m + 12), 2.5, ratio=5.0, index=1.0, decay=1.2), t + 0.4, 0.08, rng.uniform(-0.7, 0.7))
+        t += rng.uniform(0.7, 1.8)
+    return master(buf, wet=0.45, room=0.88, tone=9000, fade_in=0.2)
+
+
+def wa_mystery(seed: int, root: int, dur: float) -> np.ndarray:
+    """謎・不穏：ぶつかる低い持続音と風、都節の琴の高い音がぽつりと鳴り、ときどき遠くで太鼓"""
+    rng = np.random.default_rng(seed)
+    n = int(dur * SR)
+    buf = np.zeros((2, n))
+    place(buf, pad([midi_hz(root), midi_hz(root + 1), midi_hz(root + 7)], dur, 480, 0.3, 5, rng), 0, 0.36)
+    place(buf, sine_tone(midi_hz(root - 12), dur, 0.3, 5), 0, 0.3)
+    buf[0] += wind(n, rng, 250, 1300, 0.08) * 0.16
+    buf[1] += wind(n, rng, 250, 1300, 0.07) * 0.16
+    notes = [root + 24 + 12 * o + s for o in (0, 1) for s in MIYAKO]
+    t = 0.2
+    while t < dur - 3:
+        m = notes[rng.integers(0, len(notes))]
+        place(buf, pluck(midi_hz(m), 3.5, rng, 0.998, 2500), t, rng.uniform(0.35, 0.5), rng.uniform(-0.6, 0.6))
+        if rng.random() < 0.35:  # 半音でぶつける
+            place(buf, pluck(midi_hz(m + 1), 3.0, rng, 0.997, 2200), t + 0.09, 0.22, rng.uniform(-0.6, 0.6))
+        t += rng.uniform(1.4, 3.2)
+    for boom in np.arange(4.0, dur - 3, 7.5):
+        place(buf, taiko(rng, 1.6, 70), boom + rng.uniform(-0.3, 0.3), 0.45, rng.uniform(-0.2, 0.2))
+    return master(buf, wet=0.55, room=0.9, tone=6500, fade_in=0.2)
+
+
+def wa_tension(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """緊迫：低い持続音に、心臓の鼓動のような太鼓と、少しずつ詰まる拍子木"""
+    rng = np.random.default_rng(seed)
+    n = int(dur * SR)
+    buf = np.zeros((2, n))
+    place(buf, pad([midi_hz(root), midi_hz(root + 1), midi_hz(root + 7)], dur, 650, 0.3, 4, rng), 0, 0.3)
+    place(buf, sine_tone(midi_hz(root - 12), dur, 0.3, 4), 0, 0.3)
+    beat = 60 / bpm
+    t = 0.0
+    k = 0
+    while t < dur - 2:
+        grow = min(1.0, 0.55 + t / dur)
+        place(buf, taiko(rng, 0.8, 85), t, 0.55 * grow)
+        place(buf, taiko(rng, 0.6, 80), t + beat * 0.3, 0.35 * grow)
+        if k % 2 == 1:
+            place(buf, hyoshigi(rng), t + beat, 0.22, 0.4)
+            if t > dur * 0.5:
+                place(buf, hyoshigi(rng), t + beat * 1.5, 0.16, -0.4)
+        t += beat * 2
+        k += 1
+    return master(buf, wet=0.35, room=0.86, tone=7000, fade_in=0.2)
+
+
+def wa_danger(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """切迫：速く打ち込む太鼓と、都節で刻む琴、鋭い笛"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    bar = beat * 4
+    riff = [0, 0, 7, 0, 8, 7, 5, 1]
+    pattern = [1, 0, 0.6, 1, 0, 0.6, 1, 0.8]  # 8分の太鼓の強さ（0 は休み）
+    t = 0.0
+    i = 0
+    while t < dur - 1:
+        r = root + [0, 0, -2, 1][i % 4]
+        for s_, step in enumerate(riff):
+            place(buf, pluck(midi_hz(r + 12 + step), 0.5, rng, 0.988, 2200), t + s_ * beat / 2, 0.4, -0.2)
+            if pattern[s_]:
+                place(buf, taiko(rng, 0.5, 110), t + s_ * beat / 2, 0.42 * pattern[s_], 0.1)
+        place(buf, pad([midi_hz(m) for m in [r, r + 7, r + 13]], bar, 1400, 0.02, 0.5, rng), t, 0.2)
+        if i % 2 == 1:
+            place(buf, shakuhachi(midi_hz(r + 31), beat * 1.5, rng), t + beat * 2.5, 0.16, 0.4)
+        t += bar
+        i += 1
+    return master(buf, wet=0.22, tone=9000, fade_in=0.05)
+
+
+def wa_sad(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """切ない・余韻：ゆっくりの琴と、尺八の旋律"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    place(buf, pad([midi_hz(root), midi_hz(root + 7), midi_hz(root + 12)], dur, 800, 0.4, 5, rng), 0, 0.22)
+    notes = [root + 12 + 12 * o + s for o in (0, 1) for s in MIYAKO]
+    t = 0.2
+    pos = 5
+    while t < dur - 4:
+        pos = int(np.clip(pos + rng.choice([-2, -1, 1, 2]), 0, len(notes) - 1))
+        place(buf, pluck(midi_hz(notes[pos]), 3.5, rng, 0.997, 3000), t, 0.45, rng.uniform(-0.3, 0.3))
+        t += beat * rng.choice([1, 1.5, 2])
+    phrase = [12, 13, 17, 13, 12, 8, 7]
+    t = 1.5
+    k = 0
+    while t < dur - 5:
+        length = beat * rng.choice([2, 3])
+        place(buf, shakuhachi(midi_hz(root + 12 + phrase[k % len(phrase)]), length + 0.6, rng), t, 0.3, 0.2)
+        t += length + (beat * 2 if k % 3 == 2 else 0)
+        k += 1
+    return master(buf, wet=0.45, room=0.88, tone=6500, fade_in=0.2)
+
+
+def wa_hope(seed: int, root: int, bpm: float, dur: float) -> np.ndarray:
+    """明るい結末：陽音階の琴の分散和音、明るい和音、軽い太鼓"""
+    rng = np.random.default_rng(seed)
+    buf = np.zeros((2, int(dur * SR)))
+    beat = 60 / bpm
+    bar = beat * 4
+    roots = [0, 5, 7, 5]
+    t = 0.0
+    i = 0
+    while t < dur - 2:
+        r = root + roots[i % len(roots)]
+        place(buf, pad([midi_hz(m) for m in [r + 12, r + 19, r + 26]], bar + 1, 2000, 0.3, 1.0, rng), t, 0.2)
+        place(buf, sine_tone(midi_hz(r), bar, 0.05, 0.4), t, 0.25)
+        arp = [r + 24 + YO[k % 5] + 12 * (k // 5) for k in range(8)]
+        for step in range(8):
+            place(buf, pluck(midi_hz(arp[step]), 1.4, rng, 0.994, 5000), t + step * beat / 2, 0.22, 0.4 * np.sin(step))
+        if i >= 1:
+            place(buf, taiko(rng, 0.6, 120), t, 0.3)
+            place(buf, taiko(rng, 0.5, 130), t + beat * 2, 0.2)
+        t += bar
+        i += 1
+    return master(buf, wet=0.3, tone=10000, fade_in=0.2)
+
+
 # 場面の雰囲気（台本エージェントが場面ごとに選ぶ）→ 曲。public/bgm/<アカウント>/moods/<雰囲気>.mp3 に書き出す
 MOOD_TRACKS = {
     "cosmos": {
@@ -464,6 +641,15 @@ MOOD_TRACKS = {
         "danger": lambda: danger(74, 40, 126, 72),
         "sad": lambda: sad(75, [(45, "m7"), (41, "maj7"), (48, "maj7"), (43, "6")], 64, 72),
         "hope": lambda: hope(76, [(48, "maj"), (43, "maj"), (45, "min"), (41, "maj")], 96, 72),
+    },
+    "history": {
+        "calm": lambda: history(81, 50, 66, 72),
+        "wonder": lambda: wa_wonder(82, 50, 72),
+        "mystery": lambda: wa_mystery(83, 38, 72),
+        "tension": lambda: wa_tension(84, 38, 64, 72),
+        "danger": lambda: wa_danger(85, 40, 132, 72),
+        "sad": lambda: wa_sad(86, 50, 60, 72),
+        "hope": lambda: wa_hope(87, 50, 92, 72),
     },
 }
 

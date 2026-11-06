@@ -151,10 +151,13 @@ export const JobFrame: React.FC<{ job: JobData; children: React.ReactNode }> = (
                 loop
                 volume={(f) =>
                   BGM_VOLUME *
-                  interpolate(f, [0, BGM_CROSSFADE_FRAMES, c.durationInFrames - BGM_CROSSFADE_FRAMES, c.durationInFrames], [0, 1, 1, 0], {
-                    extrapolateLeft: "clamp",
-                    extrapolateRight: "clamp",
-                  })
+                  interpolate(
+                    f,
+                    [0, BGM_CROSSFADE_FRAMES, c.durationInFrames - BGM_CROSSFADE_FRAMES, c.durationInFrames],
+                    // 最初の曲は0フレーム目から鳴らす（冒頭を無音にしない）。2曲目からはクロスフェード
+                    [c.from === 0 ? 1 : 0, 1, 1, 0],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+                  )
                 }
               />
             </Sequence>

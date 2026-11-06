@@ -68,3 +68,25 @@ test("BGM：moods フォルダから雰囲気ごとの曲を見つける（複�
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("BGM：日本史は、謎・不穏（mystery）を含む7つの雰囲気の和の曲を持ち、2本目（昼）も同じ曲を使う", async () => {
+  const { SCENE_MOODS } = await import("../src/production/scriptAgent.js");
+  const { baseId, loadAccounts } = await import("../src/config/accounts.js");
+  const tracks = await moodTracks("history", "2026-11-06-history-v1");
+  assert.deepEqual(Object.keys(tracks).sort(), [...SCENE_MOODS].sort());
+  assert.ok(SCENE_MOODS.includes("mystery"));
+  const second = (await loadAccounts("config/accounts.yaml")).find((a) => a.id === "history_2")!;
+  assert.equal(baseId(second), "history");
+});
+
+test("accounts.yaml：日本史は「常識をくつがえす異説」の型で、説を作らない決まりがある（2本目も同じ）", async () => {
+  const { loadAccounts } = await import("../src/config/accounts.js");
+  const accounts = await loadAccounts("config/accounts.yaml");
+  for (const id of ["history", "history_2"]) {
+    const a = accounts.find((x) => x.id === id)!;
+    assert.match(a.format ?? "", /通説派？異説派？/);
+    assert.ok(a.rules.some((r) => r.includes("説を作らない")), id);
+  }
+  // 型を決めていないアカウントは標準の構成のまま
+  assert.equal(accounts.find((x) => x.id === "psychology")!.format, undefined);
+});

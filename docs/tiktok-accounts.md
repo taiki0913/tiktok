@@ -33,7 +33,7 @@
 
 | アカウント | 名前 | ID の候補（上から順に試す） | 自己紹介 | 写真 |
 |---|---|---|---|---|
-| history | 知られざる日本史 | `shirarezaru_nihonshi` / `nihonshi_no_nazo` | 教科書に載らない日本史の謎と意外な真実を、短編ドキュメンタリーで。毎日更新｜映像はCG再現と当時の写真です | `history.png` |
+| history | 知られざる日本史 | `shirarezaru_nihonshi` / `nihonshi_no_nazo` | 教科書の常識、本当に正しい？日本史の異説・謎・伝承を毎日お届け。あなたは通説派？異説派？｜映像はCG再現と当時の写真です | `history.png` |
 | urban_legend | 夜更けの都市伝説 | `yofuke_toshidensetsu` / `yofuke_no_kaidan` | 夜更けにそっと聞く、日本と世界の都市伝説。毎晩更新｜お話は伝承・創作です｜映像はAIで生成しています | `urban_legend.png` |
 | cosmos | 深海8000mからの生還（続きもの） | `uchu_shinkai_fushigi` / `uchu_to_shinkai` | 水深8000mで動けなくなった潜水艇。パイロット見習いシズクの次の行動を、あなたのコメントで決めて。物語はフィクション／深海の科学は本物 | `cosmos.png` |
 | manga_story | 深夜コンビニ物語 | `shinya_konbini_story` / `shinya_konbini` | 深夜のコンビニで働く大学生ミナトと、クセの強い常連客たちの1話完結ショート漫画。毎晩更新 | `manga_story.png` |
@@ -41,7 +41,7 @@
 | future | 20XX年の日本 | `nihon_20xx` / `japan_20xx` | 公的統計と研究機関の予測で見る「〇年後の日本」。毎日更新｜出典は動画内に記載しています | `future.png` |
 
 - ID に使えるのは、半角の英数字・`_`・`.` で、24文字まで。候補が取られていたら、末尾に `_jp` などを付ける。
-- 自己紹介は80文字まで（どれも55文字以内に収めています）。
+- 自己紹介は80文字まで（どれも60文字以内に収めています）。
 
 ## AIで作った動画の表示
 

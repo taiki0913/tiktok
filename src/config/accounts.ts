@@ -65,6 +65,8 @@ const AccountSchema = z.object({
       choiceRule: z.string(),
     })
     .optional(),
+  /** 企画と台本の型（構成とつかみ）。省略時は標準の「意外な事実の問い → 事実を積む → 答え」 */
+  format: z.string().optional(),
   /** true にすると、史実の場面で本物の写真（パブリックドメインなど、自由に使えるもの）を探して使う */
   archivePhotos: z.boolean().default(false),
   /** false にすると、企画も動画も作らない（休止） */

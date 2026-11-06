@@ -5,8 +5,8 @@ import { PRODUCTION_STYLES, type Account } from "../config/accounts.js";
 import type { Proposal } from "../domain.js";
 import { generateStructured } from "../llm/claude.js";
 
-/** 場面の雰囲気。続きものでは、雰囲気ごとに BGM を切り替える */
-export const SCENE_MOODS = ["calm", "wonder", "tension", "danger", "sad", "hope"] as const;
+/** 場面の雰囲気。雰囲気ごとの曲があるアカウント（public/bgm/<ID>/moods/）では、雰囲気ごとに BGM を切り替える */
+export const SCENE_MOODS = ["calm", "wonder", "mystery", "tension", "danger", "sad", "hope"] as const;
 
 /** 読み上げの速さの目安（VOICEVOX・速さ1.1〜1.15で、1秒あたりの文字数） */
 const CHARS_PER_SEC = 7;
@@ -16,7 +16,7 @@ export const VideoScriptSchema = z.object({
   hookText: z
     .string()
     .describe(
-      "0.0秒目から画面上部に大きく出す、つかみの文字（20字以内・2行まで）。いちばん意外な事実か問い。答えや人物名は出さない。強調する語を[ ]で囲む",
+      "0.0秒目から画面上部に大きく出す、つかみの文字（20字以内・2行まで）。いちばん意外な事実か問い。答え（核心・オチ・正体）は出さない。強調する語を[ ]で囲む",
     ),
   scenes: z
     .array(
@@ -32,7 +32,7 @@ export const VideoScriptSchema = z.object({
         mood: z
           .enum(SCENE_MOODS)
           .describe(
-            "この場面の雰囲気（BGMを選ぶのに使う）。calm=静か・落ち着き、wonder=美しさ・神秘、tension=緊迫・不安、danger=危険・急いで動く、sad=切ない・孤独、hope=希望・前向き",
+            "この場面の雰囲気（BGMを選ぶのに使う）。calm=静か・落ち着き、wonder=美しさ・神秘、mystery=謎・不穏・ぞくっとする（異説・黒幕・伝承・正体）、tension=緊迫・不安・核心に迫る、danger=危険・急いで動く・衝撃、sad=切ない・孤独・余韻、hope=希望・前向き",
           ),
       }),
     )
@@ -95,10 +95,13 @@ function systemPrompt(account: Account): string {
 ${
   account.series
     ? "- 構成：0〜3秒は hookText と同じ、今回いちばんの危機（数字を入れる）→ 前回の選択の結果 → 危機が深まる → 最後の5秒で2択。"
-    : `- 構成を固定する：0〜3秒は hookText と同じ内容の問い（いちばん意外な事実）→ 答えを伏せたまま、意外な事実を1つずつ積む → 全体の6割までに答えを出す → 答えのあとは1〜2文・5秒以内で締める。
+    : account.format
+      ? `- 構成を固定する（このアカウントの型）：${account.format.trim()}`
+      : `- 構成を固定する：0〜3秒は hookText と同じ内容の問い（いちばん意外な事実）→ 答えを伏せたまま、意外な事実を1つずつ積む → 全体の6割までに答えを出す → 答えのあとは1〜2文・5秒以内で締める。
 - 冒頭で答え・答えにつながる言葉・人物名を出さない。よく知られた雑学をそのまま問いにしない（その題材のいちばん意外な逸話を入口にする）。`
 }
 - 1場面は1文・2〜4秒。字幕は1行15字以内・2行まで。
+- mood で BGM が切り替わる。話の流れ（つかみ→不穏→核心→余韻など）に合わせて選び、同じ気持ちが続く場面は同じ mood にする（1本で3〜4種類まで。5秒未満で切り替えない）。
 - 読み上げで言う数字・人数・項目の数と、画面に出すもの（onScreen・映像の指示）を必ず一致させる。映像の指示で、読み上げと食い違う状態を描かない（例：「冷めていた」と言う場面で湯気を出さない）。
 - 締めの問い（endQuestion）は、答えと矛盾せず、意見が分かれるものにする。
 ${
