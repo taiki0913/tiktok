@@ -324,6 +324,13 @@ export function createSlackBot(opts: {
       const at = new Date().toISOString();
       const added = review.lessons.map((l) => ({ ...l, from: date, at }));
       await store.addLessons(baseId(account), added);
+      // 分析画面の数字があれば、企画エージェントが「どの企画が伸びたか」を知れるように残す
+      if (review.metrics.views !== null || review.metrics.avgWatchSec !== null) {
+        const { views, avgWatchSec, fullWatchPercent } = review.metrics;
+        await store.updateAccount(date, account.id, (s) => {
+          s.review = { views, avgWatchSec, fullWatchPercent, score: review.score, verdict: review.verdict, at };
+        });
+      }
       await app.client.chat.postMessage({ ...thread, text: `レビュー：${review.verdict}`, blocks: critiqueBlocks(date, review, added) });
     } catch (e) {
       console.error(`[review:${account.id}]`, e);

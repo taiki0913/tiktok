@@ -17,7 +17,8 @@ export interface PlanNotifier {
   summaryUpdated(day: DayState, accounts: Account[]): Promise<void>;
 }
 
-const HISTORY_DAYS = 14;
+// 投稿した結果（伸びた企画）を長く参考にできるよう、30日分を見せる
+const HISTORY_DAYS = 30;
 const REFERENCE_DAYS = 14;
 const CONCURRENCY = 2;
 

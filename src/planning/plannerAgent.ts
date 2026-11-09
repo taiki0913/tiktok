@@ -1,6 +1,6 @@
 // 企画エージェント。競合調査の結果と過去の採用履歴をもとに、アカウントごとに3案を出す。
 import { PRODUCTION_STYLES, type Account } from "../config/accounts.js";
-import { PlanSchema, type DayState, type Proposal, type ResearchBrief } from "../domain.js";
+import { PlanSchema, type DayState, type Proposal, type ResearchBrief, type ReviewSummary } from "../domain.js";
 import { generateStructured } from "../llm/claude.js";
 import { formatJpDate } from "../util/date.js";
 
@@ -41,6 +41,17 @@ ${
 ${rules || "- 特になし"}`;
 }
 
+/** 投稿した結果（再生数など）の短い説明 */
+function reviewText(r: ReviewSummary): string {
+  return [
+    r.views !== null ? `再生${r.views.toLocaleString("ja-JP")}回` : "",
+    r.avgWatchSec !== null ? `平均視聴${r.avgWatchSec}秒` : "",
+    r.fullWatchPercent !== null ? `完全視聴${r.fullWatchPercent}%` : "",
+  ]
+    .filter(Boolean)
+    .join("・");
+}
+
 /** 過去の企画。同じTikTokアカウントのもう1本（ids）の企画もまとめて見せる */
 export function historySection(ids: string[], history: DayState[]): string {
   const lines: string[] = [];
@@ -49,7 +60,8 @@ export function historySection(ids: string[], history: DayState[]): string {
     const s = day.accounts[id];
     if (!s?.proposals) continue;
     const titles = s.proposals.map((p, i) => ({ title: p.title, adopted: i === s.selectedIndex }));
-    const adopted = titles.filter((t) => t.adopted).map((t) => `「${t.title}」`);
+    const result = s.review ? `（${reviewText(s.review)}）` : "";
+    const adopted = titles.filter((t) => t.adopted).map((t) => `「${t.title}」${result}`);
     const rejected = titles.filter((t) => !t.adopted).map((t) => `「${t.title}」`);
     lines.push(
       `- ${formatJpDate(day.date)} 採用: ${adopted.join("") || (s.status === "skipped" ? "（スキップ）" : "（未決定）")}` +
@@ -58,7 +70,7 @@ export function historySection(ids: string[], history: DayState[]): string {
     for (const r of s.revisions) revisions.push(`- ${formatJpDate(day.date)}: ${r.instruction}`);
   }
   return [
-    "# 過去の企画（同じネタは避けること。採用された企画の傾向はオーナーの好み）",
+    "# 過去の企画（同じネタは避けること。採用された企画の傾向はオーナーの好み。数字が付いた企画は投稿した結果なので、伸びた企画の題材の選び方・切り口・つかみの型を優先して取り入れる）",
     lines.join("\n") || "（まだありません）",
     "# オーナーの過去の修正指示",
     revisions.join("\n") || "（まだありません）",

@@ -165,6 +165,18 @@ export interface AccountDayState {
   seriesAsk?: { episode: number; date: string; choices: SeriesChoices };
   /** 続きもの：この日に作った話について、視聴者が選んだもの */
   audienceChoice?: AudienceChoice;
+  /** 投稿した動画のレビュー（分析画面の数字。企画エージェントが、伸びた企画を知るのに使う） */
+  review?: ReviewSummary;
+}
+
+/** レビューで読み取った数字と点数 */
+export interface ReviewSummary {
+  views: number | null;
+  avgWatchSec: number | null;
+  fullWatchPercent: number | null;
+  score: number;
+  verdict: string;
+  at: string;
 }
 
 export interface DayState {

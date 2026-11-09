@@ -230,8 +230,13 @@ test("企画：同じアカウントのもう1本の過去の企画と、今日�
       history_2: { accountId: "history_2", status: "approved" as const, proposals: [p("将軍の朝ごはん")], selectedIndex: 0, revisions: [], updatedAt: "" },
     },
   };
+  day.accounts.history = {
+    ...day.accounts.history,
+    review: { views: 12345, avgWatchSec: 21.5, fullWatchPercent: 18, score: 8, verdict: "伸びた", at: "" },
+  } as typeof day.accounts.history;
   const text = historySection(["history", "history_2"], [day]);
-  assert.match(text, /写楽の正体/);
+  // 投稿した結果の数字を、採用した企画の横に出す（伸びた企画を企画エージェントが真似られるように）
+  assert.match(text, /採用: 「写楽の正体」（再生12,345回・平均視聴21.5秒・完全視聴18%）/);
   assert.match(text, /将軍の朝ごはん/);
   assert.match(sameDaySection([p("慶喜のカメラ")]), /慶喜のカメラ：慶喜のカメラの話[\s\S]*別の人物・時代・題材/);
 });
