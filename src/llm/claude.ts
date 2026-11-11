@@ -17,7 +17,7 @@ export function getClient(): Anthropic {
 /** 100万トークンあたりの料金（ドル）。費用の目安をログに出すために使う */
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
-  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
 };
 
 /** 使ったトークン数から費用の目安（ドル）を出す。料金表にないモデルは null */

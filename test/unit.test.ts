@@ -53,8 +53,8 @@ test("accounts.yaml: 6アカウントと、日本史の2本目（昼）が読み
 
 test("企画を作る日：毎日のアカウントと2日に1回のアカウントがあり、休止中のアカウントは作らない", () => {
   const on = (date: string) => accounts.filter((a) => isPlanningDay(a, date)).map((a) => a.id).sort();
-  // 日本史は毎日。心理学（group 1）のない日（group 0）は日本史を2本作る。宇宙と深海・都市伝説・漫画・未来は休止
-  assert.deepEqual(on("2026-11-01"), ["history", "history_2"]);
+  // 日本史は毎日、心理学（group 1）は2日に1回。日本史の2本目（昼）・宇宙と深海・都市伝説・漫画・未来は休止
+  assert.deepEqual(on("2026-11-01"), ["history"]);
   assert.deepEqual(on("2026-11-02"), ["history", "psychology"]);
   // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）
   assert.notDeepEqual(on("2026-10-31"), on("2026-11-01"));
@@ -211,7 +211,8 @@ test("日本史の2本目（昼）：日本史の設定を引き継ぎ、投稿�
     [second.name, second.genre, second.visual, second.archivePhotos, second.voice, second.lengthSec],
     [history.name, history.genre, history.visual, true, history.voice, history.lengthSec],
   );
-  assert.deepEqual([second.postTime, second.schedule, second.active], ["12:30", { every: 2, group: 0 }, true]);
+  // 2本目は休止中（費用を抑えるため）。休止の設定は元のアカウントから引き継がない
+  assert.deepEqual([second.postTime, second.schedule, second.active, history.active], ["12:30", { every: 2, group: 0 }, false, true]);
   assert.equal(baseId(second), "history");
   assert.equal(baseId(history), "history");
   assert.equal(displayName(second), "知られざる日本史（昼）");

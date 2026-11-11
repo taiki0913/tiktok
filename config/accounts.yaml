@@ -76,6 +76,8 @@ accounts:
     label: 昼
     postTime: "12:30"
     schedule: { every: 2, group: 0 }
+    # Claude API の費用を月100ドルに抑えるため休止（再開するときは true にする）
+    active: false
 
   - id: urban_legend
     name: 夜更けの都市伝説
