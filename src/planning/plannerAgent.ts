@@ -19,7 +19,7 @@ function systemPrompt(account: Account): string {
 - 尺: ${account.lengthSec[0]}〜${account.lengthSec[1]}秒
 
 # 企画の条件
-- ${account.lengthSec[0] >= 60 ? "収益化（TikTok Creator Rewards Program）を目指すため、尺は必ず60秒以上にする。" : `いまはフォロワーを増やす段階。収益化の条件（60秒以上）より、最後まで見られる短さを優先し、尺は${account.lengthSec[0]}〜${account.lengthSec[1]}秒にする。`}
+- ${account.lengthSec[0] >= 60 ? "収益化（TikTok Creator Rewards Program）を目指すため、尺は必ず60秒以上にする。" : `いまはフォロワーを増やす段階。収益化の条件（60秒以上）にこだわらず、題材に合った、最後まで見られる長さにする（尺は${account.lengthSec[0]}〜${account.lengthSec[1]}秒）。`}
 - オリジナルの企画にする。他人の動画の焼き直し・転載・まとめ動画にしない。
 ${
   account.series

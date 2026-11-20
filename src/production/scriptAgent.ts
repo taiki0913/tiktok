@@ -94,7 +94,7 @@ function systemPrompt(account: Account): string {
 - 見た目の方針: ${account.visual || "特になし"}
 
 # 台本の条件
-- 読み上げの合計は${minSec}〜${maxSec}秒（約${minSec * CHARS_PER_SEC}〜${maxSec * CHARS_PER_SEC}文字）。${minSec >= 60 ? "収益化の条件のため、必ず60秒以上にする。" : "いまはフォロワーを増やす段階なので、最後まで見られる短さを優先し、上限を超えない。"}
+- 読み上げの合計は${minSec}〜${maxSec}秒（約${minSec * CHARS_PER_SEC}〜${maxSec * CHARS_PER_SEC}文字）の範囲で、企画の想定の尺（lengthSec）に合わせる。${minSec >= 60 ? "収益化の条件のため、必ず60秒以上にする。" : "最後まで見られるよう、むだな文を入れない。上限を超えない。"}
 ${
   account.series
     ? "- 構成：0〜3秒は hookText と同じ、今回いちばんの危機（数字を入れる）→ 前回の選択の結果 → 危機が深まる → 最後の5秒で2択。"

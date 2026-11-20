@@ -91,12 +91,15 @@ test("accounts.yaml：日本史は「常識をくつがえす異説」の型で�
   assert.equal(accounts.find((x) => x.id === "psychology")!.format, undefined);
 });
 
-test("accounts.yaml：日本史は近代（明治〜昭和）も扱い、戦争の評価や陰謀論は扱わない", async () => {
+test("accounts.yaml：日本史は近代（明治〜昭和）と戦争の背景も扱い（最長2分）、戦争責任や陰謀論は扱わない", async () => {
   const { loadAccounts } = await import("../src/config/accounts.js");
   const history = (await loadAccounts("config/accounts.yaml")).find((x) => x.id === "history")!;
   assert.match(history.concept, /明治・大正・昭和/);
   assert.ok(history.rules.some((r) => r.includes("1案以上は、近代")));
-  assert.ok(history.rules.some((r) => r.includes("戦争") && r.includes("扱わない")));
+  // 戦争は背景・経過・戦場・評価まで扱い、戦争責任や歴史認識の論争は扱わない
+  assert.ok(history.rules.some((r) => r.includes("戦場") && r.includes("扱ってよい")));
+  assert.ok(history.rules.some((r) => r.includes("戦争責任") && r.includes("扱わない")));
+  assert.deepEqual(history.lengthSec, [35, 120]);
   assert.ok(history.rules.some((r) => r.includes("陰謀論") && r.includes("扱わない")));
   // 近代の場面を作る部品があることを、映像エージェントに伝えている
   assert.match(history.visual, /BrickBuilding.*SteamTrain.*Rickshaw.*GasLamp/s);
