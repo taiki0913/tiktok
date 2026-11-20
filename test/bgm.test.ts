@@ -104,3 +104,15 @@ test("accounts.yaml：日本史は近代（明治〜昭和）と戦争の背景�
   // 近代の場面を作る部品があることを、映像エージェントに伝えている
   assert.match(history.visual, /BrickBuilding.*SteamTrain.*Rickshaw.*GasLamp/s);
 });
+
+test("ジャンル実験：3案は別ジャンルで、BGM は宇宙と深海の雰囲気ごとの曲を使う", async () => {
+  const { bgmFolder, loadAccounts } = await import("../src/config/accounts.js");
+  const accounts = await loadAccounts("config/accounts.yaml");
+  const lab = accounts.find((x) => x.id === "lab")!;
+  assert.ok(lab.active);
+  assert.ok(lab.rules.some((r) => r.includes("別のジャンル") && r.includes("【ジャンル名】")));
+  assert.equal(bgmFolder(lab), "cosmos");
+  assert.ok(Object.keys(await moodTracks(bgmFolder(lab), "j")).includes("tension"));
+  // 指定がなければ、アカウント（もう1本なら元のアカウント）のフォルダ
+  assert.equal(bgmFolder(accounts.find((x) => x.id === "history_2")!), "history");
+});

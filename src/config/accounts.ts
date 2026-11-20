@@ -85,6 +85,8 @@ const AccountSchema = z.object({
   sameAs: z.string().optional(),
   /** もう1本のとき、Slack で名前のあとに出す呼び名（例：昼） */
   label: z.string().optional(),
+  /** BGM のフォルダ（public/bgm/<ここ>/）。省略時はアカウントID（もう1本なら元のアカウント） */
+  bgm: z.string().optional(),
 });
 
 export type Account = z.infer<typeof AccountSchema>;
@@ -100,6 +102,9 @@ export function isPlanningDay(account: Account, date: string): boolean {
 
 /** 学び・BGM・参考動画をまとめるときのアカウントID（もう1本なら、元のアカウントのID） */
 export const baseId = (account: Account): string => account.sameAs ?? account.id;
+
+/** BGM を選ぶフォルダ（public/bgm/<ここ>/） */
+export const bgmFolder = (account: Account): string => account.bgm ?? baseId(account);
 
 /** Slack などに出す名前（もう1本なら「知られざる日本史（昼）」のように呼び名を付ける） */
 export const displayName = (account: Account): string => (account.label ? `${account.name}（${account.label}）` : account.name);

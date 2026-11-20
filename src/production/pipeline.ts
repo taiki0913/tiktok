@@ -2,7 +2,7 @@
 // 1本ずつ順番に作る（PCの負荷を抑えるため）。
 import { copyFile, cp, mkdir, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { baseId, CODE_PRODUCIBLE, type Account } from "../config/accounts.js";
+import { baseId, bgmFolder, CODE_PRODUCIBLE, type Account } from "../config/accounts.js";
 import type { AccountDayState, ProductionState } from "../domain.js";
 import type { Store } from "../store/store.js";
 import { Mutex } from "../util/concurrency.js";
@@ -206,7 +206,7 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     // BGM：雰囲気ごとの曲があれば場面ごとに切り替え、なければアカウントの曲を1曲通しで流す
     let bgm: string | null = null;
     let bgmCues: BgmCue[] | undefined;
-    const moods = await moodTracks(baseId(account), jobId);
+    const moods = await moodTracks(bgmFolder(account), jobId);
     if (Object.keys(moods).length > 0) {
       const names = Object.fromEntries(Object.entries(moods).map(([mood, src]) => [mood, `bgm-${mood}${extname(src).toLowerCase()}`]));
       bgmCues = computeBgmCues(
@@ -218,12 +218,12 @@ export async function produceVideo(deps: ProductionDeps, account: Account, date:
     }
     if (!bgmCues || bgmCues.length === 0) {
       bgmCues = undefined;
-      const bgmSrc = await pickBgm(baseId(account), jobId);
+      const bgmSrc = await pickBgm(bgmFolder(account), jobId);
       if (bgmSrc) {
         bgm = `bgm${extname(bgmSrc).toLowerCase()}`;
         await copyFile(bgmSrc, join(publicDir, bgm));
       } else {
-        warnings.push(`BGM がありません（public/bgm/${baseId(account)}/ に音源を入れてください）`);
+        warnings.push(`BGM がありません（public/bgm/${bgmFolder(account)}/ に音源を入れてください）`);
       }
     }
     const job: JobData = {
