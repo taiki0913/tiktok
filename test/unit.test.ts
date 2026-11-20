@@ -53,11 +53,12 @@ test("accounts.yaml: 6アカウントと、日本史の2本目（昼）が読み
 
 test("企画を作る日：毎日のアカウントと2日に1回のアカウントがあり、休止中のアカウントは作らない", () => {
   const on = (date: string) => accounts.filter((a) => isPlanningDay(a, date)).map((a) => a.id).sort();
-  // 日本史は毎日、心理学（group 1）は2日に1回。日本史の2本目（昼）・宇宙と深海・都市伝説・漫画・未来は休止
+  // いまは日本史だけを毎日作る。日本史の2本目（昼）・心理学・宇宙と深海・都市伝説・漫画・未来は休止
   assert.deepEqual(on("2026-11-01"), ["history"]);
-  assert.deepEqual(on("2026-11-02"), ["history", "psychology"]);
-  // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）
-  assert.notDeepEqual(on("2026-10-31"), on("2026-11-01"));
+  assert.deepEqual(on("2026-11-02"), ["history"]);
+  // 月をまたいでも1日おきのまま（10/31 と 11/1 は別の組）。休止中の心理学の設定で確かめる
+  const everyOther = { ...accounts.find((a) => a.id === "psychology")!, active: true };
+  assert.notEqual(isPlanningDay(everyOther, "2026-10-31"), isPlanningDay(everyOther, "2026-11-01"));
   // 作る日のアカウントは、すべてコードで動画にできる作り方
   for (const a of accounts.filter((x) => x.active)) assert.ok(CODE_PRODUCIBLE.includes(a.production), a.id);
 });
@@ -169,7 +170,7 @@ test("Slack: 参考動画の振り分けボタンは動いているアカウン�
   assert.ok(actions && actions.type === "actions");
   assert.deepEqual(
     actions.elements.map((el) => el.type === "button" && el.action_id),
-    ["save_reference:history", "save_reference:psychology"],
+    ["save_reference:history"],
   );
   for (const el of actions.elements) {
     assert.ok(el.type === "button" && (el.value?.length ?? 0) <= 2000);

@@ -206,6 +206,8 @@ accounts:
     postTime: "12:30"
     # 宇宙と深海（group 0）と交互に、2日に1回作る
     schedule: { every: 2, group: 1 }
+    # 日本史に集中するため休止（再開するときは true にする）
+    active: false
 
   - id: future
     name: 20XX年の日本
