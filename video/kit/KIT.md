@@ -66,6 +66,10 @@
 | `UtilityPole` | position, height?, wireTo? | 電柱。wireTo に隣の電柱の位置を渡すと電線を張る |
 | `Torii` | position, rotationY?, color?, scale? | 鳥居 |
 | `Kofun` | position, rotationY?, size?, color? | 前方後円墳 |
+| `BrickBuilding` | position, rotationY?, width?, depth?, floors?, color?, trimColor?, roofColor?, tower?, lights? | 明治の煉瓦造りの洋館（駅舎・銀行・役所）。白い帯とアーチ窓。tower で正面に時計塔、lights で夜の窓明かり |
+| `SteamTrain` | position, rotationY?, frame?, cars?, color?, carColor?, lights?, smoke? | 蒸気機関車と客車（+Z が前）。frame を渡すと煙が上がり車輪が回る。走らせるときは position を frame で動かす |
+| `Rickshaw` | position, rotationY?, frame?, color?, hood? | 人力車（+Z が前）。前に Person を置くと引き手になる。frame で車輪が回る |
+| `GasLamp` | position, height?, glow?, flicker?, color? | 明治のガス灯。flicker にフレームを渡すと炎のようにゆらぐ |
 | `Mountain` | position, radius?, height?, color?, snow? | 山 |
 | `Rock` | position, size?, color?, seed? | 岩 |
 | `Character` | position, rotationY?, scale?, expression?, frame?, talking?, look?, headTurn?, pose?: "stand"/"sit", headset?, colors? | 顔のある主人公（黒髪のボブ・オレンジのパイロットスーツ）。expression は neutral/smile/worried/scared/surprised/determined/sad/relieved。frame を渡すと、まばたきと呼吸をする。talking の間は口が動く。look は目線 [左右, 上下]（-1〜1）。顔は +Z を向く。頭の中心は、座り（sit）で y≈1.2、立ちで y≈1.55 |
